@@ -4,6 +4,11 @@ SwiftUI apps for iPhone, Mac, and Apple Watch (plus Siri App Intents),
 talking to the same Supabase backend as the web app. The Xcode project is
 generated from `project.yml` — never edit `Clarity.xcodeproj` by hand.
 
+> **New here? [TESTING.md](TESTING.md)** is the complete step-by-step guide:
+> setup, building, running on simulators and real devices, using every
+> screen, quick-add syntax, Siri phrases, an end-to-end verification
+> checklist, and troubleshooting.
+
 ## Layout
 
 - `ClarityCore/` — dependency-free Swift package: Eisenhower priority
