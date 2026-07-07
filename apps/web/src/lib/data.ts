@@ -752,6 +752,107 @@ export function useDisconnectCalendar() {
 }
 
 // ---------------------------------------------------------------------------
+// AI assistant chat
+// ---------------------------------------------------------------------------
+
+export interface ChatSessionRow {
+  id: string;
+  title: string;
+  updated_at: string;
+}
+
+export interface ChatMessageRow {
+  id: string;
+  role: "user" | "assistant";
+  content: unknown[];
+  created_at: string;
+}
+
+export function useChatSessions() {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["chat_sessions"],
+    queryFn: async (): Promise<ChatSessionRow[]> => {
+      const { data, error } = await supabase
+        .from("chat_sessions")
+        .select("id, title, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useChatMessages(sessionId: string | null) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["chat_messages", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<ChatMessageRow[]> => {
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("id, role, content, created_at")
+        .eq("session_id", sessionId!)
+        .order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useSendChatMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      spaceId,
+      message,
+    }: {
+      sessionId: string | null;
+      spaceId: string;
+      message: string;
+    }): Promise<{ sessionId: string }> => {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, spaceId, message }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          data.error === "assistant_not_configured"
+            ? "assistant_not_configured"
+            : (data.error ?? "Assistant error")
+        );
+      }
+      return data;
+    },
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: ["chat_sessions"] });
+      qc.invalidateQueries({ queryKey: ["chat_messages"] });
+      // The assistant may have changed tasks/projects/blocks.
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["time_blocks"] });
+      void vars;
+    },
+  });
+}
+
+export function useDeleteChatSession() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("chat_sessions").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["chat_sessions"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Search
 // ---------------------------------------------------------------------------
 

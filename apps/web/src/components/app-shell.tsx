@@ -18,6 +18,7 @@ import {
   RefreshCcw,
   Search,
   Settings,
+  Sparkles,
   Sun,
 } from "lucide-react";
 import Link from "next/link";
@@ -30,6 +31,7 @@ import { QuickAdd } from "./quick-add";
 
 const NAV = [
   { href: "/today", label: "Today", icon: Sun },
+  { href: "/assistant", label: "Assistant", icon: Sparkles },
   { href: "/inbox", label: "Inbox", icon: Inbox, badge: "inbox" as const },
   { href: "/next", label: "Next actions", icon: LayoutList },
   { href: "/scheduled", label: "Scheduled", icon: CalendarClock },
