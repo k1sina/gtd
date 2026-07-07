@@ -8,3 +8,4 @@ supabase/.branches/
 .DS_Store
 apps/apple/**/.build/
 apps/apple/*.xcodeproj
+apps/mcp/.env
