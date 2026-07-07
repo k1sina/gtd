@@ -28,6 +28,16 @@ public struct TaskRepository: Sendable {
         return try await query.execute().value
     }
 
+    public func task(id: UUID) async throws -> TaskItem {
+        try await ctx.client
+            .from("tasks")
+            .select()
+            .eq("id", value: id.uuidString)
+            .single()
+            .execute()
+            .value
+    }
+
     public func create(_ payload: NewTaskPayload) async throws -> TaskItem {
         try await ctx.client
             .from("tasks")
