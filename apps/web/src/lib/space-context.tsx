@@ -2,7 +2,8 @@
 
 import type { Space } from "@gtd/shared";
 import { useQuery } from "@tanstack/react-query";
-import { createContext, useContext, useMemo, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { createClient } from "./supabase/client";
 
 interface SpaceContextValue {
@@ -49,6 +50,51 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     setSelectedId(id);
     localStorage.setItem(STORAGE_KEY, id);
   };
+
+  // Realtime: when someone else changes work items in the current space,
+  // refresh the local cache. RLS scopes the stream to visible rows.
+  const qc = useQueryClient();
+  const currentSpaceId = currentSpace?.id;
+  useEffect(() => {
+    if (!currentSpaceId) return;
+    const channel = supabase
+      .channel(`space-${currentSpaceId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "tasks",
+          filter: `space_id=eq.${currentSpaceId}`,
+        },
+        () => qc.invalidateQueries({ queryKey: ["tasks", currentSpaceId] })
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "projects",
+          filter: `space_id=eq.${currentSpaceId}`,
+        },
+        () => qc.invalidateQueries({ queryKey: ["projects", currentSpaceId] })
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "task_comments",
+          filter: `space_id=eq.${currentSpaceId}`,
+        },
+        () => qc.invalidateQueries({ queryKey: ["task_comments"] })
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSpaceId]);
 
   return (
     <SpaceContext.Provider

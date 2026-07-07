@@ -8,6 +8,7 @@ import type {
   LifeValue,
   Project,
   Review,
+  Space,
   Task,
   TaskStatus,
 } from "@gtd/shared";
@@ -748,6 +749,172 @@ export function useDisconnectCalendar() {
       qc.invalidateQueries({ queryKey: ["calendar_account"] });
       qc.invalidateQueries({ queryKey: ["calendar_events"] });
     },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Collaboration: spaces, members, invites, comments
+// ---------------------------------------------------------------------------
+
+export interface SpaceMemberRow {
+  user_id: string;
+  role: "owner" | "member";
+  profile: { display_name: string; email: string } | null;
+}
+
+export function useSpaceMembers(spaceId: string | undefined) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["space_members", spaceId],
+    enabled: !!spaceId,
+    queryFn: async (): Promise<SpaceMemberRow[]> => {
+      const { data, error } = await supabase
+        .from("space_members")
+        .select("user_id, role, profile:profiles(display_name, email)")
+        .eq("space_id", spaceId!);
+      if (error) throw error;
+      return data as unknown as SpaceMemberRow[];
+    },
+  });
+}
+
+export function useCreateSpace() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string): Promise<Space> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      // The on_space_created trigger adds the creator as owner.
+      const { data: space, error } = await supabase
+        .from("spaces")
+        .insert({ name, is_personal: false, created_by: user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return space;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["spaces"] }),
+  });
+}
+
+export interface SpaceInviteRow {
+  id: string;
+  email: string;
+  token: string;
+  accepted_at: string | null;
+  created_at: string;
+}
+
+export function useSpaceInvites(spaceId: string | undefined) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["space_invites", spaceId],
+    enabled: !!spaceId,
+    queryFn: async (): Promise<SpaceInviteRow[]> => {
+      const { data, error } = await supabase
+        .from("space_invites")
+        .select("id, email, token, accepted_at, created_at")
+        .eq("space_id", spaceId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCreateInvite() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      spaceId,
+      email,
+    }: {
+      spaceId: string;
+      email: string;
+    }): Promise<SpaceInviteRow> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("space_invites")
+        .insert({ space_id: spaceId, email, invited_by: user!.id })
+        .select("id, email, token, accepted_at, created_at")
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: ["space_invites", v.spaceId] }),
+  });
+}
+
+export function useRevokeInvite() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("space_invites").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["space_invites"] }),
+  });
+}
+
+export interface TaskCommentRow {
+  id: string;
+  task_id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+  profile: { display_name: string } | null;
+}
+
+export function useTaskComments(taskId: string | undefined) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["task_comments", taskId],
+    enabled: !!taskId,
+    queryFn: async (): Promise<TaskCommentRow[]> => {
+      const { data, error } = await supabase
+        .from("task_comments")
+        .select("id, task_id, user_id, body, created_at, profile:profiles(display_name)")
+        .eq("task_id", taskId!)
+        .order("created_at");
+      if (error) throw error;
+      return data as unknown as TaskCommentRow[];
+    },
+  });
+}
+
+export function useAddTaskComment() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      spaceId,
+      body,
+    }: {
+      taskId: string;
+      spaceId: string;
+      body: string;
+    }) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { error } = await supabase.from("task_comments").insert({
+        task_id: taskId,
+        space_id: spaceId,
+        user_id: user!.id,
+        body,
+      });
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: ["task_comments", v.taskId] }),
   });
 }
 

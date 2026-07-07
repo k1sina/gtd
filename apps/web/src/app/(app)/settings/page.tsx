@@ -4,6 +4,7 @@ import { DEFAULT_PLANNER_CONFIG } from "@gtd/shared";
 import { CalendarDays, Check, Unplug } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
+import { SharingSettings } from "@/components/sharing-settings";
 import { PageHeader } from "@/components/task-list";
 import { Button, Input, Select } from "@/components/ui";
 import {
@@ -58,8 +59,10 @@ function SettingsContent() {
     <div>
       <PageHeader
         title="Settings"
-        subtitle="Calendar connection and planning preferences"
+        subtitle="Sharing, calendar connection, and planning preferences"
       />
+
+      <SharingSettings />
 
       {error && (
         <p className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
