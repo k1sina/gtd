@@ -5,6 +5,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_PLANNER_CONFIG, type PlannerConfig } from "@gtd/shared";
 import { refreshTokens } from "./google";
+import { getGoogleCredentials } from "./user-settings";
 
 export interface CalendarAccount {
   id: string;
@@ -40,7 +41,13 @@ export async function getValidAccessToken(
     : 0;
   if (expiresAt - Date.now() > 60_000) return account.access_token;
 
-  const tokens = await refreshTokens(account.refresh_token);
+  const creds = await getGoogleCredentials(supabase);
+  if (!creds) {
+    throw new Error(
+      "Google client credentials missing — reconfigure them in Settings."
+    );
+  }
+  const tokens = await refreshTokens(account.refresh_token, creds);
   const { error } = await supabase
     .from("calendar_accounts")
     .update({

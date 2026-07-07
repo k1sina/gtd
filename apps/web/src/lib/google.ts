@@ -13,13 +13,18 @@ export const GOOGLE_SCOPES = [
   "https://www.googleapis.com/auth/calendar.events",
 ].join(" ");
 
-export function googleConfigured(): boolean {
-  return !!process.env.GOOGLE_CLIENT_ID && !!process.env.GOOGLE_CLIENT_SECRET;
+export interface GoogleClientCredentials {
+  clientId: string;
+  clientSecret: string;
 }
 
-export function authUrl(redirectUri: string, state: string): string {
+export function authUrl(
+  redirectUri: string,
+  state: string,
+  creds: GoogleClientCredentials
+): string {
   const params = new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID!,
+    client_id: creds.clientId,
     redirect_uri: redirectUri,
     response_type: "code",
     scope: GOOGLE_SCOPES,
@@ -49,24 +54,31 @@ async function tokenRequest(body: URLSearchParams): Promise<GoogleTokens> {
   return res.json();
 }
 
-export function exchangeCode(code: string, redirectUri: string): Promise<GoogleTokens> {
+export function exchangeCode(
+  code: string,
+  redirectUri: string,
+  creds: GoogleClientCredentials
+): Promise<GoogleTokens> {
   return tokenRequest(
     new URLSearchParams({
       code,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
       redirect_uri: redirectUri,
       grant_type: "authorization_code",
     })
   );
 }
 
-export function refreshTokens(refreshToken: string): Promise<GoogleTokens> {
+export function refreshTokens(
+  refreshToken: string,
+  creds: GoogleClientCredentials
+): Promise<GoogleTokens> {
   return tokenRequest(
     new URLSearchParams({
       refresh_token: refreshToken,
-      client_id: process.env.GOOGLE_CLIENT_ID!,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET!,
+      client_id: creds.clientId,
+      client_secret: creds.clientSecret,
       grant_type: "refresh_token",
     })
   );

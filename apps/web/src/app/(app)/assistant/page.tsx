@@ -215,10 +215,11 @@ export default function AssistantPage() {
 
         {notConfigured ? (
           <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            The assistant needs an Anthropic API key. Add{" "}
-            <code className="font-mono">ANTHROPIC_API_KEY</code> to{" "}
-            <code className="font-mono">apps/web/.env.local</code> and restart
-            the server.
+            The assistant needs an Anthropic API key — paste yours in{" "}
+            <a href="/settings" className="font-medium underline">
+              Settings → AI assistant
+            </a>
+            .
           </p>
         ) : (
           error && (
