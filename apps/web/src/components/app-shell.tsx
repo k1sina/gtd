@@ -17,6 +17,7 @@ import {
   Plus,
   RefreshCcw,
   Search,
+  Settings,
   Sun,
 } from "lucide-react";
 import Link from "next/link";
@@ -43,6 +44,7 @@ const NAV = [
   { href: "/goals", label: "Goals & values", icon: Heart },
   null,
   { href: "/search", label: "Search", icon: Search },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppShell({
