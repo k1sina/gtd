@@ -8,6 +8,7 @@ import type {
   LifeValue,
   Project,
   Review,
+  Space,
   Task,
   TaskStatus,
 } from "@gtd/shared";
@@ -585,6 +586,436 @@ export function useSaveReview() {
       return data;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["reviews"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Calendar & time-blocking
+// ---------------------------------------------------------------------------
+
+export interface CalendarEventView {
+  id: string;
+  summary: string;
+  start: string | null;
+  end: string | null;
+  allDay: boolean;
+  busy: boolean;
+}
+
+export function useCalendarEvents(dateKey: string) {
+  return useQuery({
+    queryKey: ["calendar_events", dateKey],
+    staleTime: 60_000,
+    queryFn: async (): Promise<{ connected: boolean; events: CalendarEventView[] }> => {
+      const res = await fetch(`/api/calendar/events?date=${dateKey}`);
+      if (!res.ok) return { connected: true, events: [] };
+      return res.json();
+    },
+  });
+}
+
+export interface TimeBlockRow {
+  id: string;
+  task_id: string | null;
+  starts_at: string;
+  ends_at: string;
+  status: "suggested" | "confirmed" | "synced" | "cancelled";
+  calendar_event_id: string | null;
+}
+
+export function useTimeBlocks(dateKey: string) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["time_blocks", dateKey],
+    queryFn: async (): Promise<TimeBlockRow[]> => {
+      const start = new Date(`${dateKey}T00:00:00`);
+      const end = new Date(start);
+      end.setDate(end.getDate() + 1);
+      const { data, error } = await supabase
+        .from("time_blocks")
+        .select("*")
+        .gte("starts_at", start.toISOString())
+        .lt("starts_at", end.toISOString())
+        .neq("status", "cancelled")
+        .order("starts_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function usePlanDay() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ spaceId, dateKey }: { spaceId: string; dateKey: string }) => {
+      const res = await fetch("/api/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ spaceId, date: dateKey }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Planning failed");
+      return res.json();
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["time_blocks"] }),
+  });
+}
+
+export function useConfirmPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (blockIds: string[]) => {
+      const res = await fetch("/api/plan/confirm", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blockIds }),
+      });
+      if (!res.ok) throw new Error("Confirm failed");
+      return res.json();
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["time_blocks"] });
+      qc.invalidateQueries({ queryKey: ["calendar_events"] });
+    },
+  });
+}
+
+export function useDismissPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (dateKey: string) => {
+      await fetch("/api/plan/dismiss", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ date: dateKey }),
+      });
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["time_blocks"] }),
+  });
+}
+
+export interface CalendarAccountRow {
+  id: string;
+  email: string;
+  calendar_id: string;
+  settings: Record<string, unknown>;
+}
+
+export function useCalendarAccount() {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["calendar_account"],
+    queryFn: async (): Promise<CalendarAccountRow | null> => {
+      const { data, error } = await supabase
+        .from("calendar_accounts")
+        .select("id, email, calendar_id, settings")
+        .eq("provider", "google")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useUpdateCalendarAccount() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      id,
+      ...patch
+    }: { id: string; calendar_id?: string; settings?: Record<string, unknown> }) => {
+      const { error } = await supabase
+        .from("calendar_accounts")
+        .update(patch)
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["calendar_account"] });
+      qc.invalidateQueries({ queryKey: ["calendar_events"] });
+    },
+  });
+}
+
+export function useDisconnectCalendar() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("calendar_accounts").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => {
+      qc.invalidateQueries({ queryKey: ["calendar_account"] });
+      qc.invalidateQueries({ queryKey: ["calendar_events"] });
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Collaboration: spaces, members, invites, comments
+// ---------------------------------------------------------------------------
+
+export interface SpaceMemberRow {
+  user_id: string;
+  role: "owner" | "member";
+  profile: { display_name: string; email: string } | null;
+}
+
+export function useSpaceMembers(spaceId: string | undefined) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["space_members", spaceId],
+    enabled: !!spaceId,
+    queryFn: async (): Promise<SpaceMemberRow[]> => {
+      const { data, error } = await supabase
+        .from("space_members")
+        .select("user_id, role, profile:profiles(display_name, email)")
+        .eq("space_id", spaceId!);
+      if (error) throw error;
+      return data as unknown as SpaceMemberRow[];
+    },
+  });
+}
+
+export function useCreateSpace() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (name: string): Promise<Space> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      // The on_space_created trigger adds the creator as owner.
+      const { data: space, error } = await supabase
+        .from("spaces")
+        .insert({ name, is_personal: false, created_by: user!.id })
+        .select()
+        .single();
+      if (error) throw error;
+      return space;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["spaces"] }),
+  });
+}
+
+export interface SpaceInviteRow {
+  id: string;
+  email: string;
+  token: string;
+  accepted_at: string | null;
+  created_at: string;
+}
+
+export function useSpaceInvites(spaceId: string | undefined) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["space_invites", spaceId],
+    enabled: !!spaceId,
+    queryFn: async (): Promise<SpaceInviteRow[]> => {
+      const { data, error } = await supabase
+        .from("space_invites")
+        .select("id, email, token, accepted_at, created_at")
+        .eq("space_id", spaceId!)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useCreateInvite() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      spaceId,
+      email,
+    }: {
+      spaceId: string;
+      email: string;
+    }): Promise<SpaceInviteRow> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("space_invites")
+        .insert({ space_id: spaceId, email, invited_by: user!.id })
+        .select("id, email, token, accepted_at, created_at")
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: ["space_invites", v.spaceId] }),
+  });
+}
+
+export function useRevokeInvite() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("space_invites").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["space_invites"] }),
+  });
+}
+
+export interface TaskCommentRow {
+  id: string;
+  task_id: string;
+  user_id: string;
+  body: string;
+  created_at: string;
+  profile: { display_name: string } | null;
+}
+
+export function useTaskComments(taskId: string | undefined) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["task_comments", taskId],
+    enabled: !!taskId,
+    queryFn: async (): Promise<TaskCommentRow[]> => {
+      const { data, error } = await supabase
+        .from("task_comments")
+        .select("id, task_id, user_id, body, created_at, profile:profiles(display_name)")
+        .eq("task_id", taskId!)
+        .order("created_at");
+      if (error) throw error;
+      return data as unknown as TaskCommentRow[];
+    },
+  });
+}
+
+export function useAddTaskComment() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      taskId,
+      spaceId,
+      body,
+    }: {
+      taskId: string;
+      spaceId: string;
+      body: string;
+    }) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { error } = await supabase.from("task_comments").insert({
+        task_id: taskId,
+        space_id: spaceId,
+        user_id: user!.id,
+        body,
+      });
+      if (error) throw error;
+    },
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: ["task_comments", v.taskId] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// AI assistant chat
+// ---------------------------------------------------------------------------
+
+export interface ChatSessionRow {
+  id: string;
+  title: string;
+  updated_at: string;
+}
+
+export interface ChatMessageRow {
+  id: string;
+  role: "user" | "assistant";
+  content: unknown[];
+  created_at: string;
+}
+
+export function useChatSessions() {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["chat_sessions"],
+    queryFn: async (): Promise<ChatSessionRow[]> => {
+      const { data, error } = await supabase
+        .from("chat_sessions")
+        .select("id, title, updated_at")
+        .order("updated_at", { ascending: false })
+        .limit(30);
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useChatMessages(sessionId: string | null) {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["chat_messages", sessionId],
+    enabled: !!sessionId,
+    queryFn: async (): Promise<ChatMessageRow[]> => {
+      const { data, error } = await supabase
+        .from("chat_messages")
+        .select("id, role, content, created_at")
+        .eq("session_id", sessionId!)
+        .order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useSendChatMessage() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      sessionId,
+      spaceId,
+      message,
+    }: {
+      sessionId: string | null;
+      spaceId: string;
+      message: string;
+    }): Promise<{ sessionId: string }> => {
+      const res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sessionId, spaceId, message }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(
+          data.error === "assistant_not_configured"
+            ? "assistant_not_configured"
+            : (data.error ?? "Assistant error")
+        );
+      }
+      return data;
+    },
+    onSettled: (_data, _err, vars) => {
+      qc.invalidateQueries({ queryKey: ["chat_sessions"] });
+      qc.invalidateQueries({ queryKey: ["chat_messages"] });
+      // The assistant may have changed tasks/projects/blocks.
+      qc.invalidateQueries({ queryKey: ["tasks"] });
+      qc.invalidateQueries({ queryKey: ["projects"] });
+      qc.invalidateQueries({ queryKey: ["time_blocks"] });
+      void vars;
+    },
+  });
+}
+
+export function useDeleteChatSession() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("chat_sessions").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["chat_sessions"] }),
   });
 }
 

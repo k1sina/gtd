@@ -3,6 +3,7 @@
 import { byPriority, isDeferred } from "@gtd/shared";
 import { Sun } from "lucide-react";
 import { useMemo } from "react";
+import { DayPlanner } from "@/components/day-planner";
 import { HabitStrip } from "@/components/habit-strip";
 import { PageHeader, TaskList } from "@/components/task-list";
 import { EmptyState } from "@/components/ui";
@@ -55,6 +56,7 @@ export default function TodayPage() {
       />
 
       <HabitStrip />
+      <DayPlanner />
 
       {dueTasks.length === 0 && topPicks.length === 0 && (
         <EmptyState

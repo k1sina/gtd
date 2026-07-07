@@ -52,10 +52,10 @@ npm test                  # unit tests for packages/shared
 | --- | --- | --- |
 | 0–1 | Monorepo, schema/RLS, auth, core GTD (capture → engage) | ✅ done |
 | 2 | Weekly/quarterly reviews, values & goals | ✅ done |
-| 3 | Google Calendar integration + automated time-blocking | planned |
-| 4 | AI assistant (Claude tool-use: command the app, plan my week, review copilot) | planned |
-| 5 | Collaboration: shared spaces, invites, assignments, comments, realtime | schema ready, UI planned |
-| 6 | Apple platforms: SwiftUI multiplatform app, Siri App Intents, widgets, watchOS | planned |
+| 3 | Google Calendar integration + automated time-blocking | ✅ done |
+| 4 | AI assistant (Claude tool-use: command the app, plan my week, review copilot) | ✅ done |
+| 5 | Collaboration: shared spaces, invites, assignments, comments, realtime | ✅ done |
+| 6 | Apple platforms: SwiftUI multiplatform app, Siri App Intents, widgets, watchOS | starter shipped (compile on a Mac) |
 
 The database schema for phases 3–5 (calendar accounts, time blocks, chat
 sessions, space invites, comments, activity log) already ships in the

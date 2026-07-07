@@ -17,18 +17,22 @@ import {
   Plus,
   RefreshCcw,
   Search,
+  Settings,
+  Sparkles,
   Sun,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useTasks } from "@/lib/data";
+import { useCreateSpace, useTasks } from "@/lib/data";
 import { useSpace } from "@/lib/space-context";
 import { createClient } from "@/lib/supabase/client";
 import { QuickAdd } from "./quick-add";
+import { Button, Dialog, Input } from "./ui";
 
 const NAV = [
   { href: "/today", label: "Today", icon: Sun },
+  { href: "/assistant", label: "Assistant", icon: Sparkles },
   { href: "/inbox", label: "Inbox", icon: Inbox, badge: "inbox" as const },
   { href: "/next", label: "Next actions", icon: LayoutList },
   { href: "/scheduled", label: "Scheduled", icon: CalendarClock },
@@ -43,6 +47,7 @@ const NAV = [
   { href: "/goals", label: "Goals & values", icon: Heart },
   null,
   { href: "/search", label: "Search", icon: Search },
+  { href: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppShell({
@@ -60,6 +65,7 @@ export function AppShell({
   const { data: tasks = [] } = useTasks(currentSpace?.id);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [spaceMenuOpen, setSpaceMenuOpen] = useState(false);
+  const [newSpaceOpen, setNewSpaceOpen] = useState(false);
 
   const inboxCount = useMemo(
     () => tasks.filter((t) => t.status === "inbox" && !t.parent_task_id).length,
@@ -132,6 +138,15 @@ export function AppShell({
                   )}
                 </button>
               ))}
+              <button
+                onClick={() => {
+                  setSpaceMenuOpen(false);
+                  setNewSpaceOpen(true);
+                }}
+                className="flex w-full items-center gap-1.5 rounded-md border-t border-line px-2 py-1.5 text-sm text-accent hover:bg-canvas cursor-pointer"
+              >
+                <Plus size={13} /> New shared space
+              </button>
             </div>
           )}
         </div>
@@ -203,6 +218,58 @@ export function AppShell({
       </main>
 
       {quickAddOpen && <QuickAdd onClose={() => setQuickAddOpen(false)} />}
+      {newSpaceOpen && (
+        <NewSpaceDialog
+          onClose={() => setNewSpaceOpen(false)}
+          onCreated={(id) => {
+            setCurrentSpaceId(id);
+            setNewSpaceOpen(false);
+            router.push("/settings");
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function NewSpaceDialog({
+  onClose,
+  onCreated,
+}: {
+  onClose: () => void;
+  onCreated: (spaceId: string) => void;
+}) {
+  const createSpace = useCreateSpace();
+  const [name, setName] = useState("");
+
+  async function submit() {
+    if (!name.trim()) return;
+    const space = await createSpace.mutateAsync(name.trim());
+    onCreated(space.id);
+  }
+
+  return (
+    <Dialog open onClose={onClose} title="New shared space">
+      <div className="flex flex-col gap-3 p-4">
+        <p className="text-xs text-ink-soft">
+          A shared space is a separate world of projects and tasks you can
+          invite others into — e.g. “Family” for planning with your partner.
+          Your personal space stays private.
+        </p>
+        <Input
+          autoFocus
+          placeholder="Space name (e.g. Family)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+        />
+      </div>
+      <div className="flex justify-end gap-2 border-t border-line px-4 py-2.5">
+        <Button onClick={onClose}>Cancel</Button>
+        <Button variant="primary" disabled={!name.trim()} onClick={submit}>
+          Create space
+        </Button>
+      </div>
+    </Dialog>
   );
 }

@@ -5,9 +5,12 @@ import { formatRule, parseRule } from "@gtd/shared";
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
+  useAddTaskComment,
   useCreateTask,
   useDeleteTask,
   useProjects,
+  useSpaceMembers,
+  useTaskComments,
   useTasks,
   useUpdateTask,
 } from "@/lib/data";
@@ -49,13 +52,18 @@ export function TaskDetail({
   const { currentSpace } = useSpace();
   const { data: allTasks = [] } = useTasks(currentSpace?.id);
   const { data: projects = [] } = useProjects(currentSpace?.id);
+  const { data: members = [] } = useSpaceMembers(currentSpace?.id);
+  const { data: comments = [] } = useTaskComments(task.id);
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const createTask = useCreateTask();
+  const addComment = useAddTaskComment();
 
   const [title, setTitle] = useState(task.title);
   const [notes, setNotes] = useState(task.notes ?? "");
   const [newSubtask, setNewSubtask] = useState("");
+  const [newComment, setNewComment] = useState("");
+  const isShared = !currentSpace?.is_personal && members.length > 0;
 
   // The live version of the task from cache (mutations refresh it).
   const live = useMemo(
@@ -133,6 +141,23 @@ export function TaskDetail({
               <option value="cancelled">Cancelled</option>
             </Select>
           </label>
+
+          {isShared && (
+            <label className="flex flex-col gap-1 text-xs text-ink-soft">
+              Assigned to
+              <Select
+                value={live.assigned_to ?? ""}
+                onChange={(e) => patch({ assigned_to: e.target.value || null })}
+              >
+                <option value="">Unassigned</option>
+                {members.map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.profile?.display_name || m.profile?.email}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          )}
 
           <label className="flex flex-col gap-1 text-xs text-ink-soft">
             Project
@@ -251,6 +276,49 @@ export function TaskDetail({
             onChange={(p) => patch(p)}
           />
         </div>
+
+        {/* Comments (shared spaces) */}
+        {isShared && (
+          <div className="mt-5">
+            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+              Comments
+            </h3>
+            <div className="flex flex-col gap-2">
+              {comments.map((c) => (
+                <div key={c.id} className="rounded-lg bg-canvas/70 px-3 py-2">
+                  <p className="text-[11px] font-medium text-ink-soft">
+                    {c.profile?.display_name || "Someone"}
+                    <span className="ml-2 font-normal text-ink-faint">
+                      {new Date(c.created_at).toLocaleString([], {
+                        month: "short",
+                        day: "numeric",
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-sm">{c.body}</p>
+                </div>
+              ))}
+            </div>
+            <input
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && newComment.trim() && currentSpace) {
+                  addComment.mutate({
+                    taskId: live.id,
+                    spaceId: currentSpace.id,
+                    body: newComment.trim(),
+                  });
+                  setNewComment("");
+                }
+              }}
+              placeholder="Add a comment and press Enter"
+              className="mt-2 h-9 w-full rounded-md border border-line bg-surface px-3 text-sm outline-none placeholder:text-ink-faint focus:border-accent"
+            />
+          </div>
+        )}
 
         {/* Subtasks */}
         {!live.parent_task_id && (

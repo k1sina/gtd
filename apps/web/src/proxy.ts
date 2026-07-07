@@ -37,6 +37,11 @@ export async function proxy(request: NextRequest) {
   if (!user && !isAuthRoute && request.nextUrl.pathname !== "/") {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
+    url.search = "";
+    // Preserve invite links across the login round-trip.
+    if (request.nextUrl.pathname.startsWith("/invite/")) {
+      url.searchParams.set("next", request.nextUrl.pathname);
+    }
     return NextResponse.redirect(url);
   }
 
