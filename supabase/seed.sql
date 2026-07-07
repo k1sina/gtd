@@ -1,0 +1,2 @@
+-- Local development seed. Intentionally empty: sign-up creates a profile and
+-- personal space via the handle_new_user trigger.
