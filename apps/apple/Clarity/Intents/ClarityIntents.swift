@@ -91,11 +91,13 @@ struct DueTodayIntent: AppIntent {
 
 struct ClarityShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        // Free-form String parameters may not appear in phrases (only
+        // AppEntity/AppEnum) — Siri asks "What should I capture?" instead.
         AppShortcut(
             intent: AddTaskIntent(),
             phrases: [
-                "Add \(\.$text) to \(.applicationName)",
-                "Capture \(\.$text) in \(.applicationName)",
+                "Add a task to \(.applicationName)",
+                "Capture in \(.applicationName)",
                 "\(.applicationName) capture",
             ],
             shortTitle: "Capture",

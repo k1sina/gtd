@@ -1,0 +1,5 @@
+// Supabase connection for all app targets (mapped into each Info.plist by
+// project.yml). The anon key is public by design — authorization is enforced
+// by row-level security. The $() below stops xcconfig treating // as a comment.
+SUPABASE_URL = https:/$()/uavconxsqplwzbhsfgdx.supabase.co
+SUPABASE_ANON_KEY = eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVhdmNvbnhzcXBsd3piaHNmZ2R4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM0MzUzMzcsImV4cCI6MjA5OTAxMTMzN30.FLoC1hzXvSWaNFNZjEze_ipXCemOfxaMqeY00MUaV3Y

@@ -27,9 +27,13 @@ with a partner.
 ## Stack
 
 - `apps/web` — Next.js 16 + TypeScript + Tailwind v4 + React Query
+- `apps/apple` — SwiftUI apps for iPhone, Mac, and Apple Watch plus Siri
+  App Intents (XcodeGen project; see `apps/apple/README.md`)
+- `apps/mcp` — MCP stdio server: lets Claude apps command your GTD data
+  with the same 7 tools as the built-in assistant (see `.mcp.json`)
 - `packages/shared` — dependency-free domain logic (priority scoring,
-  recurrence engine, NL parser) with Vitest tests; designed to be mirrored
-  in Swift for the Apple apps
+  recurrence engine, NL parser) with Vitest tests; mirrored in Swift as
+  `apps/apple/ClarityCore`
 - `supabase` — Postgres schema, row-level security (space-based sharing),
   auth, realtime
 
@@ -55,7 +59,8 @@ npm test                  # unit tests for packages/shared
 | 3 | Google Calendar integration + automated time-blocking | ✅ done |
 | 4 | AI assistant (Claude tool-use: command the app, plan my week, review copilot) | ✅ done |
 | 5 | Collaboration: shared spaces, invites, assignments, comments, realtime | ✅ done |
-| 6 | Apple platforms: SwiftUI multiplatform app, Siri App Intents, widgets, watchOS | starter shipped (compile on a Mac) |
+| 6 | Apple platforms: iPhone/Mac/Watch apps, Siri App Intents | ✅ done (widgets pending) |
+| 7 | MCP server: command Clarity from Claude apps | ✅ done |
 
 The database schema for phases 3–5 (calendar accounts, time blocks, chat
 sessions, space invites, comments, activity log) already ships in the

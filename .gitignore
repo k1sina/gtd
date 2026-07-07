@@ -9,3 +9,4 @@ supabase/.branches/
 apps/apple/**/.build/
 apps/apple/*.xcodeproj
 apps/mcp/.env
+apps/apple/Generated/
