@@ -1,7 +1,7 @@
 "use client";
 
 import { DEFAULT_PLANNER_CONFIG } from "@gtd/shared";
-import { CalendarDays, Check, Unplug } from "lucide-react";
+import { CalendarDays, Check, Sparkles, Unplug } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense, useState } from "react";
 import { SharingSettings } from "@/components/sharing-settings";
@@ -10,25 +10,226 @@ import { Button, Input, Select } from "@/components/ui";
 import {
   useCalendarAccount,
   useDisconnectCalendar,
+  useIntegrationStatus,
+  useSaveUserSettings,
   useUpdateCalendarAccount,
 } from "@/lib/data";
 import { useQuery } from "@tanstack/react-query";
 
 const ERROR_MESSAGES: Record<string, string> = {
   google_not_configured:
-    "Google OAuth isn't configured on the server — add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to apps/web/.env.local.",
+    "Google OAuth isn't set up yet — add your Google client ID and secret below.",
   google_denied: "Google sign-in was cancelled or the state check failed.",
   google_no_refresh_token:
     "Google didn't return a refresh token. Remove Clarity's access at myaccount.google.com/permissions, then connect again.",
-  google_exchange_failed: "Connecting to Google failed — check the server logs.",
+  google_exchange_failed:
+    "Connecting to Google failed — double-check the client ID and secret below.",
 };
+
+function SavedNote({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <p className="mt-2 flex items-center gap-1 text-xs text-emerald-600">
+      <Check size={12} /> Saved
+    </p>
+  );
+}
+
+function AssistantSettings() {
+  const { data: status } = useIntegrationStatus();
+  const save = useSaveUserSettings();
+  const [key, setKey] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const configured = status?.anthropic.configured;
+
+  return (
+    <section className="mb-8 rounded-xl border border-line bg-surface p-5">
+      <h2 className="flex items-center gap-1.5 text-sm font-semibold">
+        <Sparkles size={15} className="text-accent" /> AI assistant
+      </h2>
+      <p className="mt-1 text-xs text-ink-faint">
+        {configured
+          ? status?.anthropic.source === "settings"
+            ? "Using your API key."
+            : "Using the server's API key. Add your own to override it."
+          : "Paste an Anthropic API key to enable the assistant. Create one at console.anthropic.com → API keys."}
+      </p>
+      <form
+        className="mt-3 flex max-w-lg items-end gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const trimmed = key.trim();
+          save.mutate(
+            { anthropic_api_key: trimmed === "" ? null : trimmed },
+            {
+              onSuccess: () => {
+                setSaved(true);
+                setKey("");
+              },
+            }
+          );
+        }}
+      >
+        <label className="flex flex-1 flex-col gap-1 text-xs text-ink-soft">
+          Anthropic API key
+          <Input
+            type="password"
+            placeholder={
+              status?.anthropic.source === "settings"
+                ? "••••••••••••  (key saved — paste a new one to replace it)"
+                : "sk-ant-…"
+            }
+            value={key}
+            onChange={(e) => setKey(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <Button
+          type="submit"
+          variant="primary"
+          disabled={
+            save.isPending ||
+            (key.trim() === "" && status?.anthropic.source !== "settings")
+          }
+        >
+          {key.trim() === "" && status?.anthropic.source === "settings"
+            ? "Remove key"
+            : "Save"}
+        </Button>
+      </form>
+      {save.isError && (
+        <p className="mt-2 text-xs text-red-600">{save.error.message}</p>
+      )}
+      <SavedNote show={saved && !save.isPending} />
+    </section>
+  );
+}
+
+function GoogleSetupCard() {
+  const { data: status } = useIntegrationStatus();
+  const save = useSaveUserSettings();
+  const [clientId, setClientId] = useState("");
+  const [clientSecret, setClientSecret] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  const redirectUri =
+    status?.google.redirect_uri ??
+    (typeof window !== "undefined"
+      ? `${window.location.origin}/api/google/callback`
+      : "");
+
+  return (
+    <div className="mt-3 flex flex-col gap-3">
+      <p className="text-sm text-ink-soft">
+        Connect your calendar to see events on the Today view and let Clarity
+        block focus time for your top priorities. One-time setup with your own
+        (free) Google app:
+      </p>
+      <ol className="list-decimal space-y-1 pl-5 text-xs text-ink-soft">
+        <li>
+          Open{" "}
+          <a
+            className="text-accent underline"
+            href="https://console.cloud.google.com/apis/credentials"
+            target="_blank"
+            rel="noreferrer"
+          >
+            console.cloud.google.com/apis/credentials
+          </a>{" "}
+          and create an <b>OAuth client ID</b> (type: Web application). If
+          asked, configure the consent screen first (External, add yourself as
+          a test user) and enable the <b>Google Calendar API</b>.
+        </li>
+        <li>
+          Add this <b>authorized redirect URI</b>:{" "}
+          <code className="select-all rounded bg-canvas px-1 py-0.5 font-mono text-[11px]">
+            {redirectUri}
+          </code>
+        </li>
+        <li>Paste the client ID and secret here and hit Save, then Connect.</li>
+      </ol>
+      <form
+        className="grid max-w-lg gap-3 sm:grid-cols-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          save.mutate(
+            {
+              google_client_id: clientId.trim() || null,
+              google_client_secret: clientSecret.trim() || null,
+            },
+            { onSuccess: () => setSaved(true) }
+          );
+        }}
+      >
+        <label className="flex flex-col gap-1 text-xs text-ink-soft">
+          Client ID
+          <Input
+            placeholder="…apps.googleusercontent.com"
+            value={clientId}
+            onChange={(e) => setClientId(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <label className="flex flex-col gap-1 text-xs text-ink-soft">
+          Client secret
+          <Input
+            type="password"
+            placeholder="GOCSPX-…"
+            value={clientSecret}
+            onChange={(e) => setClientSecret(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
+        <div className="flex items-center gap-2 sm:col-span-2">
+          <Button
+            type="submit"
+            variant="primary"
+            disabled={save.isPending || !clientId.trim() || !clientSecret.trim()}
+          >
+            Save
+          </Button>
+          {status?.google.configured && (
+            <a href="/api/google/connect">
+              <Button type="button">Connect Google Calendar</Button>
+            </a>
+          )}
+        </div>
+      </form>
+      {save.isError && (
+        <p className="text-xs text-red-600">{save.error.message}</p>
+      )}
+      <SavedNote show={saved && !save.isPending} />
+    </div>
+  );
+}
+
+function GoogleConnectReady() {
+  const { data: status } = useIntegrationStatus();
+  return (
+    <div className="mt-3">
+      <p className="mb-3 text-sm text-ink-soft">
+        Connect your calendar to see events on the Today view and let Clarity
+        block focus time for your top priorities.
+        {status?.google.source === "settings" && (
+          <span className="text-ink-faint"> Using your saved Google app.</span>
+        )}
+      </p>
+      <a href="/api/google/connect">
+        <Button variant="primary">Connect Google Calendar</Button>
+      </a>
+    </div>
+  );
+}
 
 function SettingsContent() {
   const params = useSearchParams();
   const { data: account, isLoading } = useCalendarAccount();
+  const { data: status } = useIntegrationStatus();
   const updateAccount = useUpdateCalendarAccount();
   const disconnect = useDisconnectCalendar();
   const [saved, setSaved] = useState(false);
+  const [showGoogleSetup, setShowGoogleSetup] = useState(false);
 
   const { data: calendarList } = useQuery({
     queryKey: ["google_calendars"],
@@ -59,7 +260,7 @@ function SettingsContent() {
     <div>
       <PageHeader
         title="Settings"
-        subtitle="Sharing, calendar connection, and planning preferences"
+        subtitle="Sharing, integrations, and planning preferences"
       />
 
       <SharingSettings />
@@ -74,6 +275,8 @@ function SettingsContent() {
           <Check size={13} /> Google Calendar connected.
         </p>
       )}
+
+      <AssistantSettings />
 
       <section className="mb-8 rounded-xl border border-line bg-surface p-5">
         <h2 className="flex items-center gap-1.5 text-sm font-semibold">
@@ -119,16 +322,20 @@ function SettingsContent() {
               </label>
             )}
           </div>
+        ) : status && !status.google.configured ? (
+          <GoogleSetupCard />
+        ) : showGoogleSetup ? (
+          <GoogleSetupCard />
         ) : (
-          <div className="mt-3">
-            <p className="mb-3 text-sm text-ink-soft">
-              Connect your calendar to see events on the Today view and let
-              Clarity block focus time for your top priorities.
-            </p>
-            <a href="/api/google/connect">
-              <Button variant="primary">Connect Google Calendar</Button>
-            </a>
-          </div>
+          <>
+            <GoogleConnectReady />
+            <button
+              className="mt-2 text-xs text-ink-faint underline"
+              onClick={() => setShowGoogleSetup(true)}
+            >
+              Change Google app credentials
+            </button>
+          </>
         )}
       </section>
 
@@ -186,11 +393,7 @@ function SettingsContent() {
             />
           </label>
         </div>
-        {saved && (
-          <p className="mt-3 flex items-center gap-1 text-xs text-emerald-600">
-            <Check size={12} /> Saved
-          </p>
-        )}
+        <SavedNote show={saved} />
       </section>
     </div>
   );

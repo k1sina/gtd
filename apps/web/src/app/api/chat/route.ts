@@ -5,6 +5,7 @@ import {
   executeAssistantTool,
 } from "@/lib/assistant-tools";
 import { createClient } from "@/lib/supabase/server";
+import { getAnthropicApiKey } from "@/lib/user-settings";
 
 export const maxDuration = 300;
 
@@ -34,18 +35,19 @@ Today is ${now.toLocaleDateString([], { weekday: "long", year: "numeric", month:
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return NextResponse.json(
-      { error: "assistant_not_configured" },
-      { status: 501 }
-    );
-  }
-
   const supabase = await createClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+
+  const apiKey = await getAnthropicApiKey(supabase);
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "assistant_not_configured" },
+      { status: 501 }
+    );
+  }
 
   const body = await request.json().catch(() => ({}));
   const message: string = (body.message ?? "").trim();
@@ -93,7 +95,7 @@ export async function POST(request: NextRequest) {
     content: [{ type: "text", text: message }],
   });
 
-  const anthropic = new Anthropic();
+  const anthropic = new Anthropic({ apiKey });
   const toolCtx = { supabase, userId: user.id, spaceId };
   const newAssistantMessages: Anthropic.ContentBlock[][] = [];
 

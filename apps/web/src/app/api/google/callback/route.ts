@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { emailFromIdToken, exchangeCode } from "@/lib/google";
 import { createClient } from "@/lib/supabase/server";
+import { getGoogleCredentials } from "@/lib/user-settings";
 
 export async function GET(request: NextRequest) {
   const supabase = await createClient();
@@ -20,8 +21,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    const creds = await getGoogleCredentials(supabase);
+    if (!creds) {
+      return NextResponse.redirect(
+        new URL("/settings?error=google_not_configured", request.url)
+      );
+    }
     const redirectUri = new URL("/api/google/callback", request.url).toString();
-    const tokens = await exchangeCode(code, redirectUri);
+    const tokens = await exchangeCode(code, redirectUri, creds);
     if (!tokens.refresh_token) {
       // Without a refresh token the connection dies within an hour.
       return NextResponse.redirect(
