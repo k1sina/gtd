@@ -1,0 +1,28 @@
+{
+  "name": "@gtd/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local stdio MCP server exposing Clarity GTD commands, RLS-scoped to the signed-in user",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@gtd/shared": "*",
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@supabase/supabase-js": "^2.110.1",
+    "@types/ws": "^8.18.1",
+    "dotenv": "^16.4.5",
+    "tsx": "^4.19.0",
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5",
+    "vitest": "^3.0.0"
+  }
+}

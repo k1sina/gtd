@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "clarity": {
+      "command": "npm",
+      "args": ["exec", "-w", "@gtd/mcp", "--", "tsx", "src/index.ts"]
+    }
+  }
+}

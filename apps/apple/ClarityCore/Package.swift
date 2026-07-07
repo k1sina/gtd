@@ -1,4 +1,4 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.0
 import PackageDescription
 
 let package = Package(
@@ -8,7 +8,14 @@ let package = Package(
         .library(name: "ClarityCore", targets: ["ClarityCore"])
     ],
     targets: [
-        .target(name: "ClarityCore"),
-        .testTarget(name: "ClarityCoreTests", dependencies: ["ClarityCore"]),
+        .target(
+            name: "ClarityCore",
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
+        .testTarget(
+            name: "ClarityCoreTests",
+            dependencies: ["ClarityCore"],
+            swiftSettings: [.swiftLanguageMode(.v5)]
+        ),
     ]
 )

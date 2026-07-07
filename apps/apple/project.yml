@@ -1,0 +1,97 @@
+# XcodeGen spec — the committed source of truth for the Xcode project.
+# Regenerate after changes:  xcodegen generate  (the .xcodeproj is gitignored).
+name: Clarity
+
+options:
+  bundleIdPrefix: com.k1sina
+  deploymentTarget:
+    iOS: "17.0"
+    macOS: "14.0"
+    watchOS: "10.0"
+  generateEmptyDirectories: true
+
+configFiles:
+  Debug: Configs/Supabase.xcconfig
+  Release: Configs/Supabase.xcconfig
+
+settings:
+  base:
+    # Swift 5 language mode: the packages opt in explicitly and the app
+    # sources are not audited for Swift 6 strict concurrency yet.
+    SWIFT_VERSION: "5.0"
+    CODE_SIGN_STYLE: Automatic
+
+packages:
+  ClarityCore:
+    path: ClarityCore
+  ClarityKit:
+    path: ClarityKit
+
+targetTemplates:
+  ClarityApp:
+    type: application
+    dependencies:
+      - package: ClarityCore
+      - package: ClarityKit
+    settings:
+      base:
+        PRODUCT_NAME: Clarity
+        CURRENT_PROJECT_VERSION: 1
+        MARKETING_VERSION: 0.1.0
+
+targets:
+  Clarity-iOS:
+    templates: [ClarityApp]
+    platform: iOS
+    sources: [Clarity]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.k1sina.clarity
+        TARGETED_DEVICE_FAMILY: "1,2"
+    info:
+      path: Generated/Clarity-iOS-Info.plist
+      properties:
+        CFBundleDisplayName: Clarity
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+          - UIInterfaceOrientationLandscapeLeft
+          - UIInterfaceOrientationLandscapeRight
+        SupabaseURL: $(SUPABASE_URL)
+        SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+
+  Clarity-macOS:
+    templates: [ClarityApp]
+    platform: macOS
+    sources: [Clarity]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.k1sina.clarity
+    info:
+      path: Generated/Clarity-macOS-Info.plist
+      properties:
+        CFBundleDisplayName: Clarity
+        SupabaseURL: $(SUPABASE_URL)
+        SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+    entitlements:
+      path: Generated/Clarity-macOS.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.network.client: true
+
+  ClarityWatch:
+    templates: [ClarityApp]
+    platform: watchOS
+    sources: [ClarityWatch]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.k1sina.clarity.watch
+        PRODUCT_NAME: Clarity
+    info:
+      path: Generated/ClarityWatch-Info.plist
+      properties:
+        CFBundleDisplayName: Clarity
+        WKApplication: true
+        WKRunsIndependentlyOfCompanionApp: true
+        SupabaseURL: $(SUPABASE_URL)
+        SupabaseAnonKey: $(SUPABASE_ANON_KEY)

@@ -1,3 +1,4 @@
+import ClarityKit
 import SwiftUI
 
 struct SignInView: View {
@@ -13,29 +14,26 @@ struct SignInView: View {
                 .font(.system(size: 44))
                 .foregroundStyle(.indigo)
             Text("Clarity").font(.title2.bold())
+            Text("Capture everything. Clarify weekly. Do what matters.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
 
             TextField("Email", text: $email)
                 .textContentType(.emailAddress)
                 #if os(iOS)
                 .keyboardType(.emailAddress)
-                .autocapitalization(.none)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
                 #endif
             SecureField("Password", text: $password)
+                .onSubmit { Task { await signIn() } }
 
             if let error {
                 Text(error).font(.footnote).foregroundStyle(.red)
             }
 
             Button {
-                Task {
-                    busy = true
-                    defer { busy = false }
-                    do {
-                        try await session.signIn(email: email, password: password)
-                    } catch {
-                        self.error = error.localizedDescription
-                    }
-                }
+                Task { await signIn() }
             } label: {
                 Text(busy ? "Signing in…" : "Sign in")
                     .frame(maxWidth: .infinity)
@@ -46,5 +44,15 @@ struct SignInView: View {
         .textFieldStyle(.roundedBorder)
         .padding(32)
         .frame(maxWidth: 380)
+    }
+
+    private func signIn() async {
+        busy = true
+        defer { busy = false }
+        do {
+            try await session.signIn(email: email, password: password)
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 }
