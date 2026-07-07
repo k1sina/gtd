@@ -2,13 +2,7 @@
 
 import type { Space } from "@gtd/shared";
 import { useQuery } from "@tanstack/react-query";
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 import { createClient } from "./supabase/client";
 
 interface SpaceContextValue {
@@ -29,11 +23,9 @@ const STORAGE_KEY = "clarity.currentSpaceId";
 
 export function SpaceProvider({ children }: { children: React.ReactNode }) {
   const supabase = createClient();
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    setSelectedId(localStorage.getItem(STORAGE_KEY));
-  }, []);
+  const [selectedId, setSelectedId] = useState<string | null>(() =>
+    typeof window === "undefined" ? null : localStorage.getItem(STORAGE_KEY)
+  );
 
   const { data: spaces = [], isLoading } = useQuery({
     queryKey: ["spaces"],

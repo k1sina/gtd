@@ -3,7 +3,7 @@
 import type { Task, TaskStatus } from "@gtd/shared";
 import { formatRule, parseRule } from "@gtd/shared";
 import { Plus, Trash2 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   useCreateTask,
   useDeleteTask,
@@ -38,11 +38,12 @@ const RECURRENCE_PRESETS: { label: string; value: string }[] = [
   { label: "Every year", value: "FREQ=YEARLY;INTERVAL=1" },
 ];
 
+/** Mount with key={task.id} only while open so state resets per task. */
 export function TaskDetail({
   task,
   onClose,
 }: {
-  task: Task | null;
+  task: Task;
   onClose: () => void;
 }) {
   const { currentSpace } = useSpace();
@@ -52,33 +53,19 @@ export function TaskDetail({
   const deleteTask = useDeleteTask();
   const createTask = useCreateTask();
 
-  const [title, setTitle] = useState("");
-  const [notes, setNotes] = useState("");
+  const [title, setTitle] = useState(task.title);
+  const [notes, setNotes] = useState(task.notes ?? "");
   const [newSubtask, setNewSubtask] = useState("");
 
   // The live version of the task from cache (mutations refresh it).
   const live = useMemo(
-    () => allTasks.find((t) => t.id === task?.id) ?? task,
+    () => allTasks.find((t) => t.id === task.id) ?? task,
     [allTasks, task]
   );
 
-  useEffect(() => {
-    if (task) {
-      setTitle(task.title);
-      setNotes(task.notes ?? "");
-      setNewSubtask("");
-    }
-  }, [task]);
-
-  const subtasks = useMemo(
-    () =>
-      allTasks
-        .filter((t) => t.parent_task_id === live?.id)
-        .sort((a, b) => a.sort_order - b.sort_order),
-    [allTasks, live?.id]
-  );
-
-  if (!live) return null;
+  const subtasks = allTasks
+    .filter((t) => t.parent_task_id === live.id)
+    .sort((a, b) => a.sort_order - b.sort_order);
 
   const patch = (fields: Partial<Task>) =>
     updateTask.mutate({ id: live.id, ...fields });
@@ -105,7 +92,7 @@ export function TaskDetail({
   }
 
   return (
-    <Dialog open={!!task} onClose={onClose} wide title="Task">
+    <Dialog open onClose={onClose} wide title="Task">
       <div className="thin-scroll max-h-[70vh] overflow-y-auto p-4">
         <input
           value={title}

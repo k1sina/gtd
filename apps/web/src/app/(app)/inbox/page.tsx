@@ -54,7 +54,7 @@ export default function InboxPage() {
           hint="Press N anywhere to capture what's on your mind — clarify it here later."
         />
       ) : clarifying && current ? (
-        <ClarifyCard task={current} />
+        <ClarifyCard key={current.id} task={current} />
       ) : (
         <TaskList tasks={inbox} />
       )}

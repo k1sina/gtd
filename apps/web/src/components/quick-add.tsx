@@ -10,18 +10,17 @@ import {
   RefreshCcw,
   Tag,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useCreateTask, useProjects } from "@/lib/data";
 import { formatMinutes } from "@/lib/format";
 import { useSpace } from "@/lib/space-context";
 import { Badge, Dialog } from "./ui";
 
+/** Mount only while open (`{open && <QuickAdd …/>}`) so state resets per use. */
 export function QuickAdd({
-  open,
   onClose,
   defaultProjectId,
 }: {
-  open: boolean;
   onClose: () => void;
   defaultProjectId?: string;
 }) {
@@ -31,14 +30,6 @@ export function QuickAdd({
   const [text, setText] = useState("");
   const [savedCount, setSavedCount] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (open) {
-      setText("");
-      setSavedCount(0);
-      setTimeout(() => inputRef.current?.focus(), 30);
-    }
-  }, [open]);
 
   const parsed = useMemo(() => parseQuickAdd(text), [text]);
 
@@ -72,10 +63,11 @@ export function QuickAdd({
   }
 
   return (
-    <Dialog open={open} onClose={onClose} wide>
+    <Dialog open onClose={onClose} wide>
       <div className="p-4">
         <input
           ref={inputRef}
+          autoFocus
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {

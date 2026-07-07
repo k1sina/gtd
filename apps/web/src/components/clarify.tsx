@@ -11,7 +11,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import {
   useCreateProject,
   useDeleteTask,
@@ -24,7 +24,8 @@ import { Button, Input, Select } from "./ui";
 
 /**
  * GTD clarify flow: walk through inbox items one at a time and decide what
- * each one is. The list shrinks as items get clarified.
+ * each one is. The list shrinks as items get clarified. Render with
+ * key={task.id} so state resets per item.
  */
 export function ClarifyCard({ task }: { task: Task }) {
   const { currentSpace } = useSpace();
@@ -37,13 +38,6 @@ export function ClarifyCard({ task }: { task: Task }) {
   const [due, setDue] = useState("");
   const [waitingOn, setWaitingOn] = useState("");
   const [askWaiting, setAskWaiting] = useState(false);
-
-  useEffect(() => {
-    setProjectId(task.project_id ?? "");
-    setDue("");
-    setWaitingOn("");
-    setAskWaiting(false);
-  }, [task.id, task.project_id]);
 
   const base = {
     id: task.id,

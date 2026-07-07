@@ -202,7 +202,7 @@ export function AppShell({
         <div className="mx-auto max-w-3xl px-6 py-8">{children}</div>
       </main>
 
-      <QuickAdd open={quickAddOpen} onClose={() => setQuickAddOpen(false)} />
+      {quickAddOpen && <QuickAdd onClose={() => setQuickAddOpen(false)} />}
     </div>
   );
 }

@@ -58,7 +58,13 @@ export function TaskList({
           />
         ))}
       </div>
-      <TaskDetail task={selected} onClose={() => setSelected(null)} />
+      {selected && (
+        <TaskDetail
+          key={selected.id}
+          task={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </>
   );
 }

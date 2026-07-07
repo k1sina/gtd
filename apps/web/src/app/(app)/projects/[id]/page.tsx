@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation";
 import { use, useMemo, useState } from "react";
 import { TaskDetail } from "@/components/task-detail";
 import { TaskRow } from "@/components/task-row";
-import { Button, Input, Select, Textarea } from "@/components/ui";
+import { Button, Select, Textarea } from "@/components/ui";
 import {
   useCreateTask,
   useDeleteProject,
@@ -204,7 +204,13 @@ export default function ProjectPage({
         </section>
       )}
 
-      <TaskDetail task={selected} onClose={() => setSelected(null)} />
+      {selected && (
+        <TaskDetail
+          key={selected.id}
+          task={selected}
+          onClose={() => setSelected(null)}
+        />
+      )}
     </div>
   );
 }
