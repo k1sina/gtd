@@ -133,6 +133,38 @@ public struct TaskRepository: Sendable {
             .value
     }
 
+    /// Batch insert for importers. Rows colliding on (space_id, external_ref)
+    /// are silently skipped, so re-running an import is safe. Returns only the
+    /// rows actually inserted.
+    public func createMany(_ payloads: [NewTaskPayload]) async throws -> [TaskItem] {
+        guard !payloads.isEmpty else { return [] }
+        return try await ctx.client
+            .from("tasks")
+            .upsert(payloads, onConflict: "space_id,external_ref", ignoreDuplicates: true)
+            .select()
+            .execute()
+            .value
+    }
+
+    /// Existing imported tasks in the space, keyed by external_ref — used to
+    /// skip duplicates and re-link subtasks on repeated imports.
+    public func externalRefs() async throws -> [String: UUID] {
+        struct Row: Decodable {
+            let id: UUID
+            let externalRef: String?
+        }
+        let rows: [Row] = try await ctx.client
+            .from("tasks")
+            .select("id, external_ref")
+            .eq("space_id", value: ctx.spaceId.uuidString)
+            .not("external_ref", operator: .is, value: "null")
+            .execute()
+            .value
+        return Dictionary(
+            rows.compactMap { row in row.externalRef.map { ($0, row.id) } },
+            uniquingKeysWith: { first, _ in first })
+    }
+
     /// Quick capture: run the text through the natural-language parser and
     /// insert the result.
     public func capture(
