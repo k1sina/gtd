@@ -80,7 +80,9 @@ import Testing
         #expect(habit.isDue(on: date("2026-07-07T10:00:00")))
     }
 
-    @Test func encoderEmitsSnakeCaseAndOmitsNils() throws {
+    // Every key is always present (nil → explicit null) so bulk inserts have
+    // uniform columns across rows; sort_order falls back to 0, never null.
+    @Test func encoderEmitsSnakeCaseWithExplicitNulls() throws {
         let payload = NewTaskPayload(
             spaceId: UUID(), createdBy: UUID(), title: "Test",
             dueAt: date("2026-07-08T15:00:00"))
@@ -91,8 +93,9 @@ import Testing
         #expect(object["created_by"] != nil)
         #expect(object["due_at"] is String)
         #expect(object["context_tags"] is [Any])
-        #expect(object.keys.contains("notes") == false)
-        #expect(object.keys.contains("recurrence_rule") == false)
+        #expect(object["notes"] is NSNull)
+        #expect(object["recurrence_rule"] is NSNull)
+        #expect(object["sort_order"] as? Double == 0)
     }
 
     @Test func patchWritesExplicitNullsOnlyWhenClearing() throws {

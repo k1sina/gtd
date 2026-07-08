@@ -60,6 +60,9 @@ targets:
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         WebAppBaseURL: $(WEB_APP_BASE_URL)
+        NSRemindersFullAccessUsageDescription: >-
+          Clarity reads your Apple Reminders only when you run the import,
+          to bring them in as tasks.
 
   Clarity-macOS:
     templates: [ClarityApp]
@@ -75,11 +78,16 @@ targets:
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
         WebAppBaseURL: $(WEB_APP_BASE_URL)
+        NSRemindersFullAccessUsageDescription: >-
+          Clarity reads your Apple Reminders only when you run the import,
+          to bring them in as tasks.
     entitlements:
       path: Generated/Clarity-macOS.entitlements
       properties:
         com.apple.security.app-sandbox: true
         com.apple.security.network.client: true
+        # Sandbox gate for EventKit (covers Reminders as well as Calendars).
+        com.apple.security.personal-information.calendars: true
 
   ClarityWatch:
     templates: [ClarityApp]

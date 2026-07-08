@@ -23,6 +23,8 @@ public struct NewTaskPayload: Encodable, Sendable {
     public var recurrenceRule: String?
     public var recurrenceParentId: UUID?
     public var sortOrder: Double?
+    public var completedAt: Date?
+    public var externalRef: String?
 
     public init(
         spaceId: UUID,
@@ -43,7 +45,9 @@ public struct NewTaskPayload: Encodable, Sendable {
         waitingOn: String? = nil,
         recurrenceRule: String? = nil,
         recurrenceParentId: UUID? = nil,
-        sortOrder: Double? = nil
+        sortOrder: Double? = nil,
+        completedAt: Date? = nil,
+        externalRef: String? = nil
     ) {
         self.spaceId = spaceId
         self.createdBy = createdBy
@@ -64,6 +68,44 @@ public struct NewTaskPayload: Encodable, Sendable {
         self.recurrenceRule = recurrenceRule
         self.recurrenceParentId = recurrenceParentId
         self.sortOrder = sortOrder
+        self.completedAt = completedAt
+        self.externalRef = externalRef
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case spaceId, createdBy, title, notes, status, projectId, parentTaskId
+        case assignedTo, urgency, importance, dueAt, deferUntil, estimatedMinutes
+        case energy, contextTags, waitingOn, recurrenceRule, recurrenceParentId
+        case sortOrder, completedAt, externalRef
+    }
+
+    /// Explicit encoding so every row carries the same keys — PostgREST
+    /// rejects bulk inserts whose rows have differing columns. Nil optionals
+    /// become SQL nulls; `sort_order` is NOT NULL in the schema, so nil falls
+    /// back to the column default of 0 instead.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(spaceId, forKey: .spaceId)
+        try c.encode(createdBy, forKey: .createdBy)
+        try c.encode(title, forKey: .title)
+        try c.encode(notes, forKey: .notes)
+        try c.encode(status, forKey: .status)
+        try c.encode(projectId, forKey: .projectId)
+        try c.encode(parentTaskId, forKey: .parentTaskId)
+        try c.encode(assignedTo, forKey: .assignedTo)
+        try c.encode(urgency, forKey: .urgency)
+        try c.encode(importance, forKey: .importance)
+        try c.encode(dueAt, forKey: .dueAt)
+        try c.encode(deferUntil, forKey: .deferUntil)
+        try c.encode(estimatedMinutes, forKey: .estimatedMinutes)
+        try c.encode(energy, forKey: .energy)
+        try c.encode(contextTags, forKey: .contextTags)
+        try c.encode(waitingOn, forKey: .waitingOn)
+        try c.encode(recurrenceRule, forKey: .recurrenceRule)
+        try c.encode(recurrenceParentId, forKey: .recurrenceParentId)
+        try c.encode(sortOrder ?? 0, forKey: .sortOrder)
+        try c.encode(completedAt, forKey: .completedAt)
+        try c.encode(externalRef, forKey: .externalRef)
     }
 
     /// Map a quick-add parse onto an insert payload, resolving the `#Project`

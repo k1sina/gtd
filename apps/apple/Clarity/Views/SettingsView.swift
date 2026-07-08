@@ -8,6 +8,7 @@ import SwiftUI
 struct SettingsView: View {
     @Environment(AppSession.self) private var session
     @State private var showJoin = false
+    @State private var showRemindersImport = false
 
     private var appVersion: String {
         let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
@@ -43,11 +44,16 @@ struct SettingsView: View {
 
             PlannerSettingsSection()
 
+            Section("Data") {
+                Button("Import from Apple Reminders…") { showRemindersImport = true }
+            }
+
             Section("About") {
                 LabeledContent("Version", value: appVersion)
             }
         }
         .navigationTitle("Settings")
         .sheet(isPresented: $showJoin) { JoinSpaceSheet() }
+        .sheet(isPresented: $showRemindersImport) { RemindersImportView() }
     }
 }

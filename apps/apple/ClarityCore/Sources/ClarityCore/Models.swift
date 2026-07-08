@@ -34,6 +34,7 @@ public struct TaskItem: Codable, Identifiable, Hashable, Sendable, Prioritizable
     public var recurrenceParentId: UUID?
     public var sortOrder: Double
     public var completedAt: Date?
+    public var externalRef: String?
     public var createdAt: Date
     public var updatedAt: Date
 
@@ -48,7 +49,7 @@ public struct TaskItem: Codable, Identifiable, Hashable, Sendable, Prioritizable
         dueAt: Date? = nil, deferUntil: Date? = nil, estimatedMinutes: Int? = nil,
         energy: Energy? = nil, contextTags: [String] = [], waitingOn: String? = nil,
         recurrenceRule: String? = nil, recurrenceParentId: UUID? = nil,
-        sortOrder: Double = 0, completedAt: Date? = nil,
+        sortOrder: Double = 0, completedAt: Date? = nil, externalRef: String? = nil,
         createdAt: Date = Date(), updatedAt: Date = Date()
     ) {
         self.id = id
@@ -72,6 +73,7 @@ public struct TaskItem: Codable, Identifiable, Hashable, Sendable, Prioritizable
         self.recurrenceParentId = recurrenceParentId
         self.sortOrder = sortOrder
         self.completedAt = completedAt
+        self.externalRef = externalRef
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

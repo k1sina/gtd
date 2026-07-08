@@ -91,6 +91,7 @@ export interface Task {
   recurrence_parent_id: string | null;
   sort_order: number;
   completed_at: string | null;
+  external_ref: string | null;
   created_at: string;
   updated_at: string;
 }
