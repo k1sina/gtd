@@ -1040,3 +1040,52 @@ export function useSearch(spaceId: string | undefined, term: string) {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Integration settings (Settings page: Anthropic key, Google OAuth client)
+// ---------------------------------------------------------------------------
+
+export interface IntegrationStatus {
+  anthropic: { configured: boolean; source: "settings" | "env" | null };
+  google: {
+    configured: boolean;
+    source: "settings" | "env" | null;
+    client_id: string | null;
+    redirect_uri: string;
+  };
+}
+
+export function useIntegrationStatus() {
+  return useQuery({
+    queryKey: ["integration_status"],
+    queryFn: async (): Promise<IntegrationStatus> => {
+      const res = await fetch("/api/integrations/status");
+      if (!res.ok) throw new Error("Failed to load integration status");
+      return res.json();
+    },
+  });
+}
+
+export interface UserSettingsPatch {
+  anthropic_api_key?: string | null;
+  google_client_id?: string | null;
+  google_client_secret?: string | null;
+}
+
+export function useSaveUserSettings() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (patch: UserSettingsPatch) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("user_settings")
+        .upsert({ user_id: user!.id, ...patch }, { onConflict: "user_id" });
+      if (error) throw error;
+    },
+    onSettled: () =>
+      qc.invalidateQueries({ queryKey: ["integration_status"] }),
+  });
+}
