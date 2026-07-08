@@ -152,6 +152,7 @@ struct ClarifyView: View {
                 Section { Text(error).foregroundStyle(.red).font(.footnote) }
             }
         }
+        .formStyle(.grouped)
     }
 
     private func load() async {
