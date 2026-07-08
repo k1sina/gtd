@@ -194,6 +194,14 @@ link; on iPhone the switcher is in each tab's toolbar).
   and a **comments** thread in shared spaces.
 - **Calendar & planning** — Google connection status (connect on the web),
   calendar picker, workday hours, block length, max blocks/day.
+- **Data → Import from Apple Reminders…** (iPhone/Mac) — one-way import
+  into the current space. Grant Reminders access when prompted, pick lists
+  (grocery-style lists are deselected by default), optionally include
+  completed reminders. Lists/sections become projects; list names map to
+  GTD statuses (Inbox→inbox, Soon/Next→next, Waiting→waiting,
+  Someday→someday, anything else→next). Re-running skips everything
+  already imported (`tasks.external_ref`). Apple's EventKit API does not
+  expose sections, tags, or sub-task grouping, so those import flat.
 
 ### Sharing & realtime
 - Create a shared space from the space switcher, invite by email, copy the
