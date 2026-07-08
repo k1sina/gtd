@@ -4,7 +4,7 @@ import {
   getValidAccessToken,
 } from "@/lib/calendar-account";
 import { insertEvent } from "@/lib/google";
-import { createClient } from "@/lib/supabase/server";
+import { createApiContext } from "@/lib/supabase/api";
 
 /**
  * POST /api/plan/confirm { blockIds: string[] }
@@ -12,10 +12,7 @@ import { createClient } from "@/lib/supabase/server";
  * matching events and marks the blocks as synced.
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await createApiContext(request);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));

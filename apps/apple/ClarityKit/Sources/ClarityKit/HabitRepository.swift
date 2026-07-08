@@ -26,6 +26,35 @@ public struct HabitRepository: Sendable {
             .value
     }
 
+    public func create(name: String, weekdays: [Int] = []) async throws -> Habit {
+        struct Payload: Encodable {
+            let spaceId: UUID
+            let createdBy: UUID
+            let name: String
+            let weekdays: [Int]
+        }
+        return try await ctx.client
+            .from("habits")
+            .insert(Payload(
+                spaceId: ctx.spaceId, createdBy: ctx.userId, name: name,
+                weekdays: weekdays.sorted()))
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    public func archive(id: UUID) async throws {
+        struct Payload: Encodable {
+            let archivedAt: Date
+        }
+        try await ctx.client
+            .from("habits")
+            .update(Payload(archivedAt: Date()))
+            .eq("id", value: id.uuidString)
+            .execute()
+    }
+
     public func logs(since dateKey: String) async throws -> [HabitLog] {
         try await ctx.client
             .from("habit_logs")

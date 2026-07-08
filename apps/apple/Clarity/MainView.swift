@@ -2,59 +2,109 @@ import ClarityKit
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case today, inbox, next, projects
+    case today, assistant, inbox, next, scheduled, waiting, someday
+    case projects, matrix, habits
+    case reviews, goals
+    case search, settings
 
     var id: String { rawValue }
 
     var title: String {
         switch self {
         case .today: return "Today"
+        case .assistant: return "Assistant"
         case .inbox: return "Inbox"
-        case .next: return "Next"
+        case .next: return "Next actions"
+        case .scheduled: return "Scheduled"
+        case .waiting: return "Waiting for"
+        case .someday: return "Someday/maybe"
         case .projects: return "Projects"
+        case .matrix: return "Priority matrix"
+        case .habits: return "Habits"
+        case .reviews: return "Reviews"
+        case .goals: return "Goals & values"
+        case .search: return "Search"
+        case .settings: return "Settings"
         }
     }
 
     var systemImage: String {
         switch self {
         case .today: return "sun.max"
+        case .assistant: return "sparkles"
         case .inbox: return "tray"
         case .next: return "arrow.right.circle"
+        case .scheduled: return "calendar"
+        case .waiting: return "hourglass"
+        case .someday: return "moon.zzz"
         case .projects: return "folder"
+        case .matrix: return "square.grid.2x2"
+        case .habits: return "flame"
+        case .reviews: return "checklist"
+        case .goals: return "scope"
+        case .search: return "magnifyingglass"
+        case .settings: return "gearshape"
         }
     }
+
+    /// Sidebar groups mirroring the web app's navigation.
+    static let groups: [(title: String?, sections: [AppSection])] = [
+        (nil, [.today, .assistant, .inbox, .next, .scheduled, .waiting, .someday]),
+        ("Organize", [.projects, .matrix, .habits]),
+        ("Horizons", [.reviews, .goals]),
+        ("System", [.search, .settings]),
+    ]
+
+    /// iOS: sections that live in the Browse tab rather than the tab bar.
+    static let browse: [AppSection] = [
+        .scheduled, .waiting, .someday, .projects, .matrix, .habits,
+        .reviews, .goals, .assistant, .search,
+    ]
 }
 
 struct MainView: View {
     @Environment(AppSession.self) private var session
     @State private var section: AppSection = .today
+    @State private var inboxCount = 0
 
     var body: some View {
         #if os(macOS)
         NavigationSplitView {
-            List(AppSection.allCases, selection: sidebarSelection) { section in
-                Label(section.title, systemImage: section.systemImage)
-                    .tag(section)
+            List(selection: sidebarSelection) {
+                ForEach(AppSection.groups, id: \.sections.first) { group in
+                    Section(group.title ?? "") {
+                        ForEach(group.sections) { section in
+                            Label(section.title, systemImage: section.systemImage)
+                                .badge(section == .inbox && inboxCount > 0 ? inboxCount : 0)
+                                .tag(section)
+                        }
+                    }
+                }
             }
-            .navigationSplitViewColumnWidth(min: 170, ideal: 190)
-            .safeAreaInset(edge: .bottom) {
-                Button("Sign out") { Task { await session.signOut() } }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(.secondary)
-                    .font(.footnote)
-                    .padding(.bottom, 10)
+            .navigationSplitViewColumnWidth(min: 190, ideal: 210)
+            .safeAreaInset(edge: .top) {
+                SpaceSwitcherMenu()
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
             }
         } detail: {
-            content
+            NavigationStack { sectionView(section) }
+                .id(session.dataEpoch)
         }
+        .task(id: session.dataEpoch) { session.startRealtime() }
+        .task(id: session.reloadKey) { await refreshInboxCount() }
         #else
         TabView(selection: $section) {
-            ForEach(AppSection.allCases) { section in
-                NavigationStack { sectionView(section) }
-                    .tabItem { Label(section.title, systemImage: section.systemImage) }
-                    .tag(section)
-            }
+            tab(.today)
+            tab(.inbox)
+            tab(.next)
+            NavigationStack { BrowseView() }
+                .tabItem { Label("Browse", systemImage: "square.grid.2x2") }
+                .tag(AppSection.projects) // any non-tab section selects Browse
+            tab(.settings)
         }
+        .id(session.dataEpoch)
+        .task(id: session.dataEpoch) { session.startRealtime() }
         #endif
     }
 
@@ -63,18 +113,59 @@ struct MainView: View {
         Binding(get: { section }, set: { section = $0 ?? .today })
     }
 
-    private var content: some View {
+    private func refreshInboxCount() async {
+        guard let ctx = try? session.requireContext() else { return }
+        inboxCount = (try? await TaskRepository(ctx).inboxCount()) ?? 0
+    }
+    #else
+    private func tab(_ section: AppSection) -> some View {
         NavigationStack { sectionView(section) }
+            .tabItem { Label(section.title, systemImage: section.systemImage) }
+            .tag(section)
     }
     #endif
+}
 
-    @ViewBuilder
-    private func sectionView(_ section: AppSection) -> some View {
-        switch section {
-        case .today: TodayView()
-        case .inbox: InboxView()
-        case .next: NextView()
-        case .projects: ProjectsView()
+/// Where each section's screen lives; shared by the macOS sidebar and the
+/// iOS Browse tab.
+@ViewBuilder
+func sectionView(_ section: AppSection) -> some View {
+    switch section {
+    case .today: TodayView()
+    case .assistant: AssistantView()
+    case .inbox: InboxView()
+    case .next: NextView()
+    case .scheduled: ScheduledView()
+    case .waiting: WaitingView()
+    case .someday: SomedayView()
+    case .projects: ProjectsView()
+    case .matrix: MatrixView()
+    case .habits: HabitsView()
+    case .reviews: ReviewsHubView()
+    case .goals: GoalsView()
+    case .search: SearchView()
+    case .settings: SettingsView()
+    }
+}
+
+#if os(iOS)
+/// Everything that doesn't fit in the tab bar, mirroring the web sidebar.
+struct BrowseView: View {
+    @Environment(AppSession.self) private var session
+
+    var body: some View {
+        List(AppSection.browse) { section in
+            NavigationLink(value: section) {
+                Label(section.title, systemImage: section.systemImage)
+            }
+        }
+        .navigationTitle("Browse")
+        .navigationDestination(for: AppSection.self) { section in
+            sectionView(section)
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { SpaceSwitcherMenu() }
         }
     }
 }
+#endif

@@ -9,6 +9,7 @@ struct InboxView: View {
     @State private var projects: [Project] = []
     @State private var captureText = ""
     @State private var editing: TaskItem?
+    @State private var clarifying = false
     @State private var loading = true
     @State private var error: String?
 
@@ -52,7 +53,23 @@ struct InboxView: View {
         }
         .navigationTitle("Inbox")
         .refreshable { await load() }
-        .task { await load() }
+        .task(id: session.reloadKey) { await load() }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    clarifying = true
+                } label: {
+                    Label("Clarify", systemImage: "wand.and.stars")
+                }
+                .disabled(tasks.isEmpty)
+            }
+            #if os(iOS)
+            ToolbarItem(placement: .topBarTrailing) { SpaceSwitcherMenu() }
+            #endif
+        }
+        .sheet(isPresented: $clarifying, onDismiss: { Task { await load() } }) {
+            ClarifyView()
+        }
         .sheet(item: $editing) { task in
             TaskEditView(task: task, projects: projects) { await load() }
         }

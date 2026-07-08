@@ -17,6 +17,26 @@ public enum Quadrant: String, Codable, Sendable {
         case .eliminate: return "Eliminate"
         }
     }
+
+    public var hint: String {
+        switch self {
+        case .doFirst: return "Urgent + important"
+        case .schedule: return "Important, not urgent"
+        case .delegate: return "Urgent, not important"
+        case .eliminate: return "Neither"
+        }
+    }
+
+    /// Urgency/importance written to a task dropped into this quadrant on the
+    /// priority matrix. Mirrors QUADRANT_VALUES in the web matrix page.
+    public var representativeValues: (urgency: Int, importance: Int) {
+        switch self {
+        case .doFirst: return (4, 4)
+        case .schedule: return (2, 4)
+        case .delegate: return (4, 2)
+        case .eliminate: return (2, 2)
+        }
+    }
 }
 
 public let highThreshold = 3 // 3..4 counts as "high" on either axis

@@ -27,6 +27,10 @@ struct TaskEditView: View {
     @State private var tagsText: String
     @State private var waitingOn: String
     @State private var recurrence: String?
+    @State private var subtasks: [TaskItem] = []
+    @State private var newSubtask = ""
+    @State private var members: [SpaceMemberInfo] = []
+    @State private var assignedTo: UUID?
     @State private var busy = false
     @State private var error: String?
 
@@ -58,6 +62,7 @@ struct TaskEditView: View {
         _tagsText = State(initialValue: task.contextTags.joined(separator: ", "))
         _waitingOn = State(initialValue: task.waitingOn ?? "")
         _recurrence = State(initialValue: task.recurrenceRule)
+        _assignedTo = State(initialValue: task.assignedTo)
     }
 
     var body: some View {
@@ -82,6 +87,16 @@ struct TaskEditView: View {
                     }
                     if status == .waiting {
                         TextField("Waiting on", text: $waitingOn)
+                    }
+                    if session.currentSpace?.isPersonal == false && !members.isEmpty {
+                        Picker("Assignee", selection: $assignedTo) {
+                            Text("Unassigned").tag(UUID?.none)
+                            ForEach(members) { member in
+                                Text(member.profile.displayName.isEmpty
+                                    ? member.profile.email : member.profile.displayName)
+                                    .tag(UUID?.some(member.userId))
+                            }
+                        }
                     }
                 }
                 Section("Priority") {
@@ -126,9 +141,17 @@ struct TaskEditView: View {
                     }
                     TextField("Tags (comma separated)", text: $tagsText)
                 }
+                if task.parentTaskId == nil {
+                    subtasksSection
+                }
+                CommentsSection(task: task)
                 if let error {
                     Section { Text(error).foregroundStyle(.red).font(.footnote) }
                 }
+            }
+            .task {
+                await loadSubtasks()
+                await loadMembers()
             }
             .navigationTitle("Edit task")
             #if os(iOS)
@@ -147,6 +170,70 @@ struct TaskEditView: View {
         #if os(macOS)
         .frame(minWidth: 440, minHeight: 520)
         #endif
+    }
+
+    /// Checklist-style sub-tasks — mirrors the subtasks block in the web
+    /// task detail dialog.
+    private var subtasksSection: some View {
+        Section("Subtasks") {
+            ForEach(subtasks) { subtask in
+                HStack(spacing: 10) {
+                    Button {
+                        Task { await toggleSubtask(subtask) }
+                    } label: {
+                        Image(systemName: subtask.status == .done ? "checkmark.circle.fill" : "circle")
+                            .foregroundStyle(subtask.status == .done ? Color.green : Color.secondary)
+                    }
+                    .buttonStyle(.plain)
+                    Text(subtask.title)
+                        .strikethrough(subtask.status == .done)
+                        .foregroundStyle(subtask.status == .done ? .secondary : .primary)
+                }
+            }
+            HStack {
+                Image(systemName: "plus.circle").foregroundStyle(.secondary)
+                TextField("Add a subtask…", text: $newSubtask)
+                    .textFieldStyle(.plain)
+                    .onSubmit { Task { await addSubtask() } }
+            }
+        }
+    }
+
+    private func loadMembers() async {
+        guard session.currentSpace?.isPersonal == false,
+              let ctx = try? session.requireContext() else { return }
+        members = (try? await SpaceRepository(ctx).members()) ?? []
+    }
+
+    private func loadSubtasks() async {
+        guard task.parentTaskId == nil,
+              let ctx = try? session.requireContext() else { return }
+        subtasks = (try? await TaskRepository(ctx).subtasks(of: task.id)) ?? []
+    }
+
+    private func addSubtask() async {
+        let text = newSubtask.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return }
+        newSubtask = ""
+        do {
+            let ctx = try session.requireContext()
+            _ = try await TaskRepository(ctx).create(NewTaskPayload(
+                spaceId: ctx.spaceId, createdBy: ctx.userId, title: text,
+                status: .next, projectId: task.projectId, parentTaskId: task.id))
+            await loadSubtasks()
+        } catch {
+            self.error = error.localizedDescription
+        }
+    }
+
+    private func toggleSubtask(_ subtask: TaskItem) async {
+        do {
+            let ctx = try session.requireContext()
+            try await TaskRepository(ctx).complete(subtask, done: subtask.status != .done)
+            await loadSubtasks()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     private func save() async {
@@ -179,6 +266,10 @@ struct TaskEditView: View {
         }
         if let recurrence { patch.recurrenceRule = recurrence } else {
             patch.clearRecurrenceRule = true
+        }
+        if session.currentSpace?.isPersonal == false {
+            if let assignedTo { patch.assignedTo = assignedTo }
+            else { patch.clearAssignedTo = true }
         }
 
         do {

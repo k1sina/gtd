@@ -80,7 +80,7 @@ private func makeTask(
         let userId = UUID()
         let family = Project(
             id: UUID(), spaceId: spaceId, name: "Family", outcome: nil,
-            status: "active", sortOrder: 0)
+            status: .active, sortOrder: 0)
         let parsed = parseQuickAdd(
             "Call mom tomorrow at 3pm @phone #Family !urgent ~15m", now: now)
         let payload = NewTaskPayload(
@@ -106,10 +106,10 @@ private func makeTask(
         let spaceId = UUID()
         let active = Project(
             id: UUID(), spaceId: spaceId, name: "Active", outcome: nil,
-            status: "active", sortOrder: 0)
+            status: .active, sortOrder: 0)
         let moving = Project(
             id: UUID(), spaceId: spaceId, name: "Moving", outcome: nil,
-            status: "active", sortOrder: 1)
+            status: .active, sortOrder: 1)
         var waiting = makeTask(status: .waiting)
         waiting.projectId = active.id
         var next = makeTask(status: .next)
