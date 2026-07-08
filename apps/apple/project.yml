@@ -59,6 +59,7 @@ targets:
           - UIInterfaceOrientationLandscapeRight
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        WebAppBaseURL: $(WEB_APP_BASE_URL)
 
   Clarity-macOS:
     templates: [ClarityApp]
@@ -73,6 +74,7 @@ targets:
         CFBundleDisplayName: Clarity
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)
+        WebAppBaseURL: $(WEB_APP_BASE_URL)
     entitlements:
       path: Generated/Clarity-macOS.entitlements
       properties:
@@ -92,6 +94,6 @@ targets:
       properties:
         CFBundleDisplayName: Clarity
         WKApplication: true
-        WKRunsIndependentlyOfCompanionApp: true
+        WKWatchOnly: true
         SupabaseURL: $(SUPABASE_URL)
         SupabaseAnonKey: $(SUPABASE_ANON_KEY)

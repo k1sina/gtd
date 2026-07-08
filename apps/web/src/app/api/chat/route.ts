@@ -4,7 +4,7 @@ import {
   ASSISTANT_TOOLS,
   executeAssistantTool,
 } from "@/lib/assistant-tools";
-import { createClient } from "@/lib/supabase/server";
+import { createApiContext } from "@/lib/supabase/api";
 
 export const maxDuration = 300;
 
@@ -41,10 +41,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await createApiContext(request);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));

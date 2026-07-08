@@ -4,14 +4,11 @@ import {
   getValidAccessToken,
 } from "@/lib/calendar-account";
 import { listCalendars } from "@/lib/google";
-import { createClient } from "@/lib/supabase/server";
+import { createApiContext } from "@/lib/supabase/api";
 
 /** GET /api/google/calendars — writable calendars on the connected account. */
-export async function GET() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+export async function GET(request: Request) {
+  const { supabase, user } = await createApiContext(request);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const account = await getCalendarAccount(supabase);

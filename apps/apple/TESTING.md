@@ -114,14 +114,24 @@ xcodebuild -project Clarity.xcodeproj -scheme ClarityWatch \
 Sign in with your Clarity account (created on the web). The session persists
 in the keychain; you won't be asked again.
 
-The iPhone app has four tabs; the Mac app has the same four sections in a
-sidebar:
+The iPhone app has five tabs — **Today, Inbox, Next, Browse, Settings** —
+where Browse holds everything else (Scheduled, Waiting, Someday, Projects,
+Matrix, Habits, Reviews, Goals, Assistant, Search). The Mac app shows all
+sections in a grouped sidebar, with the **space switcher** at the top
+(switch spaces, create a shared space, or join one from a pasted invite
+link; on iPhone the switcher is in each tab's toolbar).
 
 ### Today
 - **Due & overdue** — everything dated before end of today, ranked by
   priority (importance beats urgency; overdue items get a boost).
 - **Top priorities** — the 5 highest-leverage next actions that aren't
   already listed above (deferred tasks are excluded).
+- **Habit strip** — today's due habits as tappable chips (with 🔥 streaks).
+- **Schedule** — calendar events + focus blocks; **Plan my day** asks the
+  server to propose blocks, then Confirm (syncs to Google Calendar when
+  connected on the web) or Dismiss.
+- **Completed today** — what you already finished; tap the circle to
+  un-complete.
 - The capture field at the top accepts natural language — see the table
   below.
 - Tap the circle to **complete** a task. Completing a repeating task
@@ -133,18 +143,65 @@ sidebar:
   - swipe **right** → *Next* (it's actionable)
   - swipe **left** → *Someday* or *Delete*
   - tap → full editor (status, project, priority, dates, recurrence, tags…)
+- The **Clarify** toolbar button walks the inbox one item at a time with
+  the full GTD decision set: *Did it (2-min rule)*, *Next*, *Schedule*,
+  *Waiting for…*, *Someday*, *It's a project* (spawns a project + seed
+  task), *Trash* — same flow as the web.
 
 ### Next
 - Every next action, highest leverage first. The colored dot is the
   Eisenhower quadrant (red = do first, blue = schedule, orange = delegate,
   gray = eliminate). Deferred tasks are dimmed until their defer date.
+- Filter chips narrow by `@context` tag and energy level.
+
+### Scheduled / Waiting / Someday (Browse tab on iPhone)
+- **Scheduled** groups date-bound + deferred tasks: Overdue, Today, Next
+  7 days, Later.
+- **Waiting for** lists delegated items (swipe right when they land back on
+  your plate).
+- **Someday/maybe** parks ideas; swipe right to activate.
 
 ### Projects
-- Active projects with open-task counts. An orange **stalled** badge means
-  an active project has no next action — GTD says fix that first.
-- Tap a project for its tasks; the add-field inside a project creates tasks
-  directly in it (as *Next*).
-- Type in the top field on the list to create a new project.
+- Grouped by **area of focus** ("No area" last), with progress bars and an
+  orange **stalled** badge when an active project has no next action.
+- The **+** button opens the create dialog (name, outcome, area — or create
+  a new area inline).
+- Project detail: edit name/outcome inline, change status (completing
+  stamps the completion date), assign an area, delete (with confirmation),
+  and add tasks straight into the project. Subtasks show indented with
+  done/total counts.
+
+### Matrix, Habits, Reviews, Goals, Assistant, Search
+- **Priority matrix** — the four Eisenhower quadrants. Drag tasks between
+  quadrants on Mac/iPad; on iPhone long-press → *Move to…*. Dropping sets
+  the quadrant's representative urgency/importance (same values as web).
+- **Habits** — current week Mon–Sun grid per habit, streaks, create with
+  weekday selection, swipe to archive.
+- **Reviews** — weekly (6 guided steps; progress persists mid-review and
+  resumes on any platform) and quarterly (score goals 0–10, reflect, seed
+  next quarter's goals). The hub shows your weekly streak and history.
+- **Goals & values** — life values and quarterly goals with value links,
+  statuses, and scores.
+- **Assistant** — the same GTD coach as the web `/assistant` page; it can
+  read and change your tasks/projects and plan your day. Requires the web
+  deployment to have `ANTHROPIC_API_KEY` set.
+- **Search** — full-text over titles and notes.
+
+### Settings
+- Profile, **sign out**, space switcher + join-a-space.
+- In a **shared space**: members with roles, invite by email, copy invite
+  links, revoke pending invites. Task editor gains an **assignee** picker
+  and a **comments** thread in shared spaces.
+- **Calendar & planning** — Google connection status (connect on the web),
+  calendar picker, workday hours, block length, max blocks/day.
+
+### Sharing & realtime
+- Create a shared space from the space switcher, invite by email, copy the
+  link, and accept it on another account via the web `/invite` page or the
+  native "Join a space…" sheet.
+- Edits made on the web (or by another member) appear on Mac/iPhone within
+  a second or two — the apps subscribe to realtime changes for the current
+  space.
 
 ### Quick-add syntax
 
@@ -205,7 +262,8 @@ open. If you're signed out, Siri answers "Please sign in to Clarity first."
 
 A 10-minute pass that exercises every moving part:
 
-1. `./scripts/test-swift.sh` → 31 tests green.
+1. `./scripts/test-swift.sh` → 62 tests green (34 ClarityCore +
+   28 ClarityKit).
 2. Build & run **Clarity-macOS**; sign in.
 3. Capture `Water plants every 3 days ~10m @home` → appears in **Inbox**
    with a repeat icon and the parse chips shown beforehand.
@@ -222,6 +280,17 @@ A 10-minute pass that exercises every moving part:
    after a refresh.
 8. On a real iPhone: say "Add a task to Clarity", answer with something
    dated; then "What's due today in Clarity" and hear it read back.
+9. **Sharing:** create a shared space from the space switcher, invite a
+   second account, copy the link, and join from the other account (web
+   `/invite` page or the native "Join a space…" sheet). Edit a task from
+   the web while the Mac app is open on the same space — it refreshes
+   within a couple of seconds (realtime). Assign the task and comment on
+   it from both sides.
+10. **Reviews:** run the weekly review two steps in, quit the app, reopen —
+    it resumes on step 3 (checklist persists per period).
+11. **Assistant & planner** (needs `ANTHROPIC_API_KEY` on the web
+    deployment): ask "what should I focus on today?" and watch the tool
+    captions; on Today press **Plan my day** and confirm a block.
 
 ## 9. Troubleshooting
 

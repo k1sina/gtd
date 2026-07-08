@@ -20,19 +20,41 @@ public struct ProjectRepository: Sendable {
             .value
     }
 
-    public func create(name: String, outcome: String? = nil) async throws -> Project {
+    public func create(
+        name: String, outcome: String? = nil, areaId: UUID? = nil
+    ) async throws -> Project {
         struct Payload: Encodable {
             let spaceId: UUID
             let name: String
             let outcome: String?
+            let areaId: UUID?
         }
         return try await ctx.client
             .from("projects")
-            .insert(Payload(spaceId: ctx.spaceId, name: name, outcome: outcome))
+            .insert(Payload(spaceId: ctx.spaceId, name: name, outcome: outcome, areaId: areaId))
             .select()
             .single()
             .execute()
             .value
+    }
+
+    public func update(id: UUID, patch: ProjectPatch) async throws -> Project {
+        try await ctx.client
+            .from("projects")
+            .update(patch)
+            .eq("id", value: id.uuidString)
+            .select()
+            .single()
+            .execute()
+            .value
+    }
+
+    public func delete(id: UUID) async throws {
+        try await ctx.client
+            .from("projects")
+            .delete()
+            .eq("id", value: id.uuidString)
+            .execute()
     }
 }
 
@@ -56,7 +78,7 @@ public struct ProjectSummary: Identifiable, Sendable {
                 project: project,
                 openTasks: open.count,
                 doneTasks: done,
-                stalled: project.status == "active" && !hasNext
+                stalled: project.status == .active && !hasNext
             )
         }
     }

@@ -11,7 +11,7 @@ import {
   plannerConfig,
 } from "@/lib/calendar-account";
 import { listEvents } from "@/lib/google";
-import { createClient } from "@/lib/supabase/server";
+import { createApiContext } from "@/lib/supabase/api";
 
 /**
  * POST /api/plan { date?: "YYYY-MM-DD", spaceId: string }
@@ -19,10 +19,7 @@ import { createClient } from "@/lib/supabase/server";
  * user's calendar, replacing any previous suggestions for that day.
  */
 export async function POST(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await createApiContext(request);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const body = await request.json().catch(() => ({}));

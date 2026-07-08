@@ -4,14 +4,11 @@ import {
   getValidAccessToken,
 } from "@/lib/calendar-account";
 import { listEvents } from "@/lib/google";
-import { createClient } from "@/lib/supabase/server";
+import { createApiContext } from "@/lib/supabase/api";
 
 /** GET /api/calendar/events?date=YYYY-MM-DD — that day's events (local time). */
 export async function GET(request: NextRequest) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { supabase, user } = await createApiContext(request);
   if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
 
   const account = await getCalendarAccount(supabase);

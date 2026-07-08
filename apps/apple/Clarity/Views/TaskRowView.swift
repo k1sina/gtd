@@ -17,6 +17,7 @@ extension Quadrant {
 struct TaskRowView: View {
     let task: TaskItem
     var dimmed = false
+    var subtaskStats: (done: Int, total: Int)?
     let onComplete: () -> Void
     let onTap: () -> Void
 
@@ -42,6 +43,10 @@ struct TaskRowView: View {
                     }
                     if let waiting = task.waitingOn, !waiting.isEmpty {
                         Label(waiting, systemImage: "hourglass")
+                            .foregroundStyle(.secondary)
+                    }
+                    if let stats = subtaskStats, stats.total > 0 {
+                        Label("\(stats.done)/\(stats.total)", systemImage: "checklist")
                             .foregroundStyle(.secondary)
                     }
                     ForEach(task.contextTags, id: \.self) { tag in

@@ -13,7 +13,8 @@ public struct TaskRepository: Sendable {
     /// excluded by default (matching the web views).
     public func tasks(
         statuses: [TaskStatus]? = nil,
-        topLevelOnly: Bool = true
+        topLevelOnly: Bool = true,
+        completedAfter: Date? = nil
     ) async throws -> [TaskItem] {
         var query = ctx.client
             .from("tasks")
@@ -25,7 +26,91 @@ public struct TaskRepository: Sendable {
         if topLevelOnly {
             query = query.is("parent_task_id", value: nil)
         }
+        if let completedAfter {
+            query = query.gte(
+                "completed_at",
+                value: ISO8601DateFormatter().string(from: completedAfter))
+        }
         return try await query.execute().value
+    }
+
+    /// Number of unclarified inbox items (sidebar badge).
+    public func inboxCount() async throws -> Int {
+        let response = try await ctx.client
+            .from("tasks")
+            .select("id", head: true, count: .exact)
+            .eq("space_id", value: ctx.spaceId.uuidString)
+            .eq("status", value: TaskStatus.inbox.rawValue)
+            .is("parent_task_id", value: nil)
+            .execute()
+        return response.count ?? 0
+    }
+
+    /// Full-text search over title + notes (the generated `search` tsvector).
+    /// Terms are AND-joined — mirrors useSearch in apps/web/src/lib/data.ts.
+    public func search(_ term: String) async throws -> [TaskItem] {
+        let words = term.split(separator: " ").map(String.init).filter { !$0.isEmpty }
+        guard !words.isEmpty else { return [] }
+        return try await ctx.client
+            .from("tasks")
+            .select()
+            .eq("space_id", value: ctx.spaceId.uuidString)
+            .textSearch("search", query: words.joined(separator: " & "))
+            .limit(50)
+            .execute()
+            .value
+    }
+
+    public func subtasks(of parentId: UUID) async throws -> [TaskItem] {
+        try await ctx.client
+            .from("tasks")
+            .select()
+            .eq("parent_task_id", value: parentId.uuidString)
+            .order("created_at")
+            .execute()
+            .value
+    }
+
+    /// Done/total sub-task counts for the given parents, aggregated
+    /// client-side (matches how the web derives subtask stats).
+    public func subtaskCounts(for taskIds: [UUID]) async throws -> [UUID: (done: Int, total: Int)] {
+        guard !taskIds.isEmpty else { return [:] }
+        struct Row: Decodable {
+            let parentTaskId: UUID?
+            let status: TaskStatus
+        }
+        let rows: [Row] = try await ctx.client
+            .from("tasks")
+            .select("parent_task_id, status")
+            .in("parent_task_id", values: taskIds.map(\.uuidString))
+            .execute()
+            .value
+        return Self.aggregateSubtaskCounts(rows.map { ($0.parentTaskId, $0.status) })
+    }
+
+    /// Pure aggregation helper (unit-tested).
+    static func aggregateSubtaskCounts(
+        _ rows: [(parentTaskId: UUID?, status: TaskStatus)]
+    ) -> [UUID: (done: Int, total: Int)] {
+        var counts: [UUID: (done: Int, total: Int)] = [:]
+        for row in rows {
+            guard let parent = row.parentTaskId else { continue }
+            var entry = counts[parent] ?? (0, 0)
+            entry.total += 1
+            if row.status == .done { entry.done += 1 }
+            counts[parent] = entry
+        }
+        return counts
+    }
+
+    public func tasks(ids: [UUID]) async throws -> [TaskItem] {
+        guard !ids.isEmpty else { return [] }
+        return try await ctx.client
+            .from("tasks")
+            .select()
+            .in("id", values: ids.map(\.uuidString))
+            .execute()
+            .value
     }
 
     public func task(id: UUID) async throws -> TaskItem {

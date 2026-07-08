@@ -6,7 +6,11 @@ import SwiftUI
 struct TodayView: View {
     @Environment(AppSession.self) private var session
     @State private var tasks: [TaskItem] = []
+    @State private var subtaskCounts: [UUID: (done: Int, total: Int)] = [:]
+    @State private var completedToday: [TaskItem] = []
     @State private var projects: [Project] = []
+    @State private var habits: [Habit] = []
+    @State private var habitLogs: [HabitLog] = []
     @State private var captureText = ""
     @State private var editing: TaskItem?
     @State private var loading = true
@@ -32,10 +36,15 @@ struct TodayView: View {
         List {
             Section {
                 QuickAddField(text: $captureText) { Task { await capture() } }
+                let dueHabits = habits.filter { $0.isDue(on: Date()) }
+                if !dueHabits.isEmpty {
+                    HabitStripView(habits: dueHabits, logs: habitLogs) { await load() }
+                }
             }
             if let error {
                 Section { Text(error).foregroundStyle(.red).font(.footnote) }
             }
+            DayPlannerView()
             if !dueToday.isEmpty {
                 Section("Due & overdue") {
                     ForEach(dueToday) { task in row(task) }
@@ -48,17 +57,33 @@ struct TodayView: View {
                 }
                 ForEach(topPicks) { task in row(task) }
             }
+            if !completedToday.isEmpty {
+                Section("Completed today · \(completedToday.count)") {
+                    ForEach(completedToday) { task in
+                        TaskRowView(task: task) {
+                            Task { await uncomplete(task) }
+                        } onTap: {
+                            editing = task
+                        }
+                    }
+                }
+            }
         }
         .navigationTitle("Today")
         .refreshable { await load() }
-        .task { await load() }
+        .task(id: session.reloadKey) { await load() }
+        #if os(iOS)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) { SpaceSwitcherMenu() }
+        }
+        #endif
         .sheet(item: $editing) { task in
             TaskEditView(task: task, projects: projects) { await load() }
         }
     }
 
     private func row(_ task: TaskItem) -> some View {
-        TaskRowView(task: task) {
+        TaskRowView(task: task, subtaskStats: subtaskCounts[task.id]) {
             Task { await complete(task) }
         } onTap: {
             editing = task
@@ -68,16 +93,38 @@ struct TodayView: View {
     private func load() async {
         do {
             let ctx = try session.requireContext()
-            async let tasksLoad = TaskRepository(ctx)
-                .tasks(statuses: [.next, .scheduled, .inbox, .waiting])
+            let repo = TaskRepository(ctx)
+            async let tasksLoad = repo.tasks(statuses: [.next, .scheduled, .inbox, .waiting])
+            async let doneLoad = repo.tasks(
+                statuses: [.done],
+                completedAfter: Calendar.current.startOfDay(for: .now))
             async let projectsLoad = ProjectRepository(ctx).projects()
+            let habitRepo = HabitRepository(ctx)
+            async let habitsLoad = habitRepo.habits()
+            async let logsLoad = habitRepo.logs(
+                since: Dates.dateKey(Dates.addDays(Date(), -366)))
             tasks = try await tasksLoad
+            subtaskCounts = try await repo.subtaskCounts(for: tasks.map(\.id))
+            completedToday = try await doneLoad
+                .sorted { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }
             projects = try await projectsLoad
+            habits = try await habitsLoad
+            habitLogs = try await logsLoad
             error = nil
         } catch {
             self.error = error.localizedDescription
         }
         loading = false
+    }
+
+    private func uncomplete(_ task: TaskItem) async {
+        do {
+            let ctx = try session.requireContext()
+            try await TaskRepository(ctx).complete(task, done: false)
+            await load()
+        } catch {
+            self.error = error.localizedDescription
+        }
     }
 
     private func capture() async {

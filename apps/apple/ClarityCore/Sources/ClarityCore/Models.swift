@@ -77,24 +77,72 @@ public struct TaskItem: Codable, Identifiable, Hashable, Sendable, Prioritizable
     }
 }
 
+public enum ProjectStatus: String, Codable, CaseIterable, Sendable {
+    case active, someday, completed, archived
+    case onHold = "on_hold"
+
+    public var label: String {
+        switch self {
+        case .active: return "Active"
+        case .someday: return "Someday"
+        case .onHold: return "On hold"
+        case .completed: return "Completed"
+        case .archived: return "Archived"
+        }
+    }
+}
+
 public struct Project: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var spaceId: UUID
+    public var areaId: UUID?
+    public var goalId: UUID?
     public var name: String
     public var outcome: String?
-    public var status: String
+    public var status: ProjectStatus
     public var sortOrder: Double
+    public var reviewedAt: Date?
+    public var createdAt: Date
+    public var completedAt: Date?
 
     public init(
-        id: UUID, spaceId: UUID, name: String, outcome: String? = nil,
-        status: String = "active", sortOrder: Double = 0
+        id: UUID, spaceId: UUID, areaId: UUID? = nil, goalId: UUID? = nil,
+        name: String, outcome: String? = nil, status: ProjectStatus = .active,
+        sortOrder: Double = 0, reviewedAt: Date? = nil,
+        createdAt: Date = Date(), completedAt: Date? = nil
     ) {
         self.id = id
         self.spaceId = spaceId
+        self.areaId = areaId
+        self.goalId = goalId
         self.name = name
         self.outcome = outcome
         self.status = status
         self.sortOrder = sortOrder
+        self.reviewedAt = reviewedAt
+        self.createdAt = createdAt
+        self.completedAt = completedAt
+    }
+}
+
+public struct Area: Codable, Identifiable, Hashable, Sendable {
+    public var id: UUID
+    public var spaceId: UUID
+    public var name: String
+    public var color: String?
+    public var sortOrder: Double
+    public var createdAt: Date
+
+    public init(
+        id: UUID, spaceId: UUID, name: String, color: String? = nil,
+        sortOrder: Double = 0, createdAt: Date = Date()
+    ) {
+        self.id = id
+        self.spaceId = spaceId
+        self.name = name
+        self.color = color
+        self.sortOrder = sortOrder
+        self.createdAt = createdAt
     }
 }
 
@@ -102,6 +150,16 @@ public struct Space: Codable, Identifiable, Hashable, Sendable {
     public var id: UUID
     public var name: String
     public var isPersonal: Bool
+    public var createdBy: UUID
+    public var createdAt: Date
+
+    public init(id: UUID, name: String, isPersonal: Bool, createdBy: UUID, createdAt: Date = Date()) {
+        self.id = id
+        self.name = name
+        self.isPersonal = isPersonal
+        self.createdBy = createdBy
+        self.createdAt = createdAt
+    }
 }
 
 public struct Habit: Codable, Identifiable, Hashable, Sendable {

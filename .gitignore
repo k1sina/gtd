@@ -10,3 +10,5 @@ apps/apple/**/.build/
 apps/apple/*.xcodeproj
 apps/mcp/.env
 apps/apple/Generated/
+apps/apple/**/.swiftpm/
+apps/apple/build/
