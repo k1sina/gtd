@@ -3,7 +3,7 @@ import {
   getCalendarAccount,
   getValidAccessToken,
 } from "@/lib/calendar-account";
-import { listEvents } from "@/lib/google";
+import { GoogleReauthRequiredError, listEvents } from "@/lib/google";
 import { createApiContext } from "@/lib/supabase/api";
 
 /** GET /api/calendar/events?date=YYYY-MM-DD — that day's events (local time). */
@@ -36,6 +36,12 @@ export async function GET(request: NextRequest) {
       })),
     });
   } catch (err) {
+    if (err instanceof GoogleReauthRequiredError) {
+      return NextResponse.json(
+        { connected: true, events: [], error: "google_reauth_required" },
+        { status: 401 }
+      );
+    }
     console.error("Calendar events fetch failed:", err);
     return NextResponse.json(
       { connected: true, events: [], error: "calendar_fetch_failed" },

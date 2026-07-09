@@ -42,6 +42,17 @@ export interface GoogleTokens {
   id_token?: string;
 }
 
+/**
+ * The refresh token is dead (revoked, or expired after 7 days because the
+ * OAuth app was left in "Testing" status) — the user must reconnect.
+ */
+export class GoogleReauthRequiredError extends Error {
+  constructor() {
+    super("Google connection expired — reconnect Google Calendar in Settings.");
+    this.name = "GoogleReauthRequiredError";
+  }
+}
+
 async function tokenRequest(body: URLSearchParams): Promise<GoogleTokens> {
   const res = await fetch(TOKEN_URL, {
     method: "POST",
@@ -49,7 +60,9 @@ async function tokenRequest(body: URLSearchParams): Promise<GoogleTokens> {
     body,
   });
   if (!res.ok) {
-    throw new Error(`Google token request failed (${res.status}): ${await res.text()}`);
+    const text = await res.text();
+    if (text.includes("invalid_grant")) throw new GoogleReauthRequiredError();
+    throw new Error(`Google token request failed (${res.status}): ${text}`);
   }
   return res.json();
 }

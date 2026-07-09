@@ -121,6 +121,15 @@ export function DayPlanner() {
         </div>
       </div>
 
+      {calendar?.reauthRequired && (
+        <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+          Google Calendar connection expired —{" "}
+          <Link href="/settings" className="font-medium underline">
+            reconnect in Settings
+          </Link>{" "}
+          to see events and sync blocks.
+        </p>
+      )}
       {!showCard || items.length === 0 ? (
         <p className="text-xs text-ink-faint">
           {calendar?.connected

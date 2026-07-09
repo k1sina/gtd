@@ -176,6 +176,7 @@ struct NewProjectSheet: View {
                     Section { Text(error).foregroundStyle(.red).font(.footnote) }
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle("New project")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

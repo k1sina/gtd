@@ -196,6 +196,7 @@ struct NewHabitSheet: View {
                     Section { Text(error).foregroundStyle(.red).font(.footnote) }
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle("New habit")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)

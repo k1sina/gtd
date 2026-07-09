@@ -24,6 +24,8 @@ const ERROR_MESSAGES: Record<string, string> = {
     "Google didn't return a refresh token. Remove Clarity's access at myaccount.google.com/permissions, then connect again.",
   google_exchange_failed:
     "Connecting to Google failed — double-check the client ID and secret below.",
+  google_reauth_required:
+    "Google connection expired — reconnect below. Tip: publish your Google OAuth app to Production (no verification needed) so this stops happening.",
 };
 
 function SavedNote({ show }: { show: boolean }) {
@@ -138,8 +140,14 @@ function GoogleSetupCard() {
             console.cloud.google.com/apis/credentials
           </a>{" "}
           and create an <b>OAuth client ID</b> (type: Web application). If
-          asked, configure the consent screen first (External, add yourself as
-          a test user) and enable the <b>Google Calendar API</b>.
+          asked, configure the consent screen first (audience: External) and
+          enable the <b>Google Calendar API</b>.
+        </li>
+        <li>
+          Under <b>Audience</b> (the consent screen page), click{" "}
+          <b>Publish app</b> to move it to Production. <b>Skip verification</b>{" "}
+          — you don&apos;t need it for your own app. (If left in Testing mode,
+          Google disconnects the calendar every 7 days.)
         </li>
         <li>
           Add this <b>authorized redirect URI</b>:{" "}
@@ -147,7 +155,12 @@ function GoogleSetupCard() {
             {redirectUri}
           </code>
         </li>
-        <li>Paste the client ID and secret here and hit Save, then Connect.</li>
+        <li>
+          Paste the client ID and secret here and hit Save, then Connect. When
+          Google warns that it &ldquo;hasn&rsquo;t verified this app&rdquo;,
+          click <b>Advanced → Go to Clarity</b> — it&apos;s your own app, so
+          this one-time warning is expected and safe.
+        </li>
       </ol>
       <form
         className="grid max-w-lg gap-3 sm:grid-cols-2"
@@ -286,6 +299,20 @@ function SettingsContent() {
           <p className="mt-3 text-sm text-ink-faint">Loading…</p>
         ) : account ? (
           <div className="mt-3 flex flex-col gap-4">
+            {calendarList?.error === "google_reauth_required" && (
+              <div className="flex items-center justify-between gap-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                <span>
+                  Google connection expired — reconnect to keep reading events
+                  and syncing blocks. To stop this from recurring, publish your
+                  Google OAuth app to Production (no verification needed).
+                </span>
+                <a href="/api/google/connect" className="shrink-0">
+                  <Button size="sm" variant="primary">
+                    Reconnect
+                  </Button>
+                </a>
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <p className="text-sm">
                 Connected as <span className="font-medium">{account.email}</span>

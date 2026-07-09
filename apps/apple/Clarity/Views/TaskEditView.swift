@@ -149,6 +149,9 @@ struct TaskEditView: View {
                     Section { Text(error).foregroundStyle(.red).font(.footnote) }
                 }
             }
+            // macOS falls back to the misaligned "columns" style without this;
+            // on iOS grouped is already the default.
+            .formStyle(.grouped)
             .task {
                 await loadSubtasks()
                 await loadMembers()

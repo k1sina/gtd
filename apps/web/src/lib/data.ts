@@ -606,10 +606,21 @@ export function useCalendarEvents(dateKey: string) {
   return useQuery({
     queryKey: ["calendar_events", dateKey],
     staleTime: 60_000,
-    queryFn: async (): Promise<{ connected: boolean; events: CalendarEventView[] }> => {
+    queryFn: async (): Promise<{
+      connected: boolean;
+      events: CalendarEventView[];
+      reauthRequired?: boolean;
+    }> => {
       const res = await fetch(`/api/calendar/events?date=${dateKey}`);
-      if (!res.ok) return { connected: true, events: [] };
-      return res.json();
+      const body = await res.json().catch(() => null);
+      if (!res.ok) {
+        return {
+          connected: true,
+          events: [],
+          reauthRequired: body?.error === "google_reauth_required",
+        };
+      }
+      return body;
     },
   });
 }

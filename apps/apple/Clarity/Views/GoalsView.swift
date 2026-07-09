@@ -215,6 +215,7 @@ struct ValueEditSheet: View {
                     Text(error).foregroundStyle(.red).font(.footnote)
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(draft.id == nil ? "New value" : "Edit value")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
@@ -318,6 +319,7 @@ struct GoalEditSheet: View {
                     Section { Text(error).foregroundStyle(.red).font(.footnote) }
                 }
             }
+            .formStyle(.grouped)
             .navigationTitle(draft.id == nil ? "New goal" : "Edit goal")
             #if os(iOS)
             .navigationBarTitleDisplayMode(.inline)
