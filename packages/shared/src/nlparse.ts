@@ -55,12 +55,9 @@ function isoWeekday(d: Date): number {
   return (d.getDay() + 6) % 7;
 }
 
-/** Next calendar day with the given ISO weekday, strictly after `from` unless it is today. */
-function upcomingWeekday(from: Date, target: number, forceNextWeek: boolean): Date {
-  let diff = (target - isoWeekday(from) + 7) % 7;
-  if (diff === 0 && forceNextWeek) diff = 7;
-  else if (forceNextWeek && diff > 0) diff += 7 * 0; // "next monday" = the coming monday, a week later only when today IS monday
-  if (diff === 0) diff = 0; // plain "monday" on a monday = today
+/** Next calendar day with the given ISO weekday; today when it matches (the caller decides whether a same-day match means today or next week). */
+function upcomingWeekday(from: Date, target: number): Date {
+  const diff = (target - isoWeekday(from) + 7) % 7;
   return addDays(startOfDay(from), diff);
 }
 
@@ -195,11 +192,10 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
   if (!dueDay)
     eat(new RegExp(`(?<=\\s)(next\\s+)?(${dayAlt})\\b`, "i"), (m) => {
       const target = WEEKDAYS.indexOf(m[2]!.toLowerCase());
-      const isNext = !!m[1];
-      let d = upcomingWeekday(now, target, false);
-      // plain weekday on the same day means the coming one, not today
-      if (!isNext && d.getTime() === startOfDay(now).getTime()) d = addDays(d, 7);
-      if (isNext && d.getTime() === startOfDay(now).getTime()) d = addDays(d, 7);
+      let d = upcomingWeekday(now, target);
+      // A weekday naming today ("monday" or "next monday" on a Monday)
+      // means the coming one, not today.
+      if (d.getTime() === startOfDay(now).getTime()) d = addDays(d, 7);
       dueDay = d;
     });
   if (!dueDay)

@@ -45,8 +45,9 @@ SwiftUI apps for iPhone/Mac/Watch with Siri App Intents, and an MCP server.
 - Weekday numbering everywhere: 0 = Monday … 6 = Sunday (`isoWeekday`).
 - Task recurrence: RRULE strings handled by `packages/shared/src/recurrence.ts`
   (FREQ/INTERVAL/BYDAY/BYMONTHDAY subset only); completing a recurring task
-  inserts the next occurrence CLIENT-side — the logic lives in web
-  `useCompleteTask`, Swift `TaskRepository.complete`, and MCP
-  `complete_task`; change all three together.
+  inserts the next occurrence CLIENT-side — the insert payload comes from
+  `nextOccurrenceInsert` (`packages/shared/src/completion.ts`) for all TS
+  clients (web UI, web assistant, MCP) and from Swift
+  `TaskRepository.nextOccurrencePayload`; keep those two in sync.
 - New tables in `public` are NOT auto-exposed to API roles — migrations must
   GRANT to `authenticated` and add RLS policies.

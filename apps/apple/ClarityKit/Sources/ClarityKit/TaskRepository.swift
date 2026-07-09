@@ -47,15 +47,16 @@ public struct TaskRepository: Sendable {
     }
 
     /// Full-text search over title + notes (the generated `search` tsvector).
-    /// Terms are AND-joined — mirrors useSearch in apps/web/src/lib/data.ts.
+    /// websearch_to_tsquery ANDs plain words and never throws on operator
+    /// characters in user input — mirrors useSearch in apps/web/src/lib/data.ts.
     public func search(_ term: String) async throws -> [TaskItem] {
-        let words = term.split(separator: " ").map(String.init).filter { !$0.isEmpty }
-        guard !words.isEmpty else { return [] }
+        let trimmed = term.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return [] }
         return try await ctx.client
             .from("tasks")
             .select()
             .eq("space_id", value: ctx.spaceId.uuidString)
-            .textSearch("search", query: words.joined(separator: " & "))
+            .textSearch("search", query: trimmed, type: .websearch)
             .limit(50)
             .execute()
             .value

@@ -123,6 +123,19 @@ describe("planDay", () => {
     expect(blocks[0]!.end).toEqual(t("16:00"));
   });
 
+  it("treats a zero/negative estimate as no estimate", () => {
+    const blocks = planDay(
+      [task("zero", { estimated_minutes: 0 })],
+      [],
+      day,
+      DEFAULT_PLANNER_CONFIG,
+      earlyMorning
+    );
+    expect(blocks[0]!.end.getTime() - blocks[0]!.start.getTime()).toBe(
+      DEFAULT_PLANNER_CONFIG.defaultBlockMinutes * 60_000
+    );
+  });
+
   it("respects maxBlocks", () => {
     const many = Array.from({ length: 10 }, (_, i) =>
       task(`t${i}`, { estimated_minutes: 15 })

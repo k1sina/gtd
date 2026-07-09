@@ -12,7 +12,7 @@ import type {
   Task,
   TaskStatus,
 } from "@gtd/shared";
-import { nextOccurrence } from "@gtd/shared";
+import { nextOccurrenceInsert } from "@gtd/shared";
 import {
   useMutation,
   useQuery,
@@ -155,32 +155,13 @@ export function useCompleteTask() {
         .eq("id", task.id);
       if (error) throw error;
 
-      if (done && task.recurrence_rule && !task.parent_task_id) {
-        const now = new Date();
-        const anchor = task.due_at ? new Date(task.due_at) : now;
-        const next = nextOccurrence(task.recurrence_rule, anchor, now);
-        if (next) {
-          const {
-            data: { user },
-          } = await supabase.auth.getUser();
-          const { error: insertError } = await supabase.from("tasks").insert({
-            space_id: task.space_id,
-            project_id: task.project_id,
-            created_by: user!.id,
-            assigned_to: task.assigned_to,
-            title: task.title,
-            notes: task.notes,
-            status: task.status === "inbox" ? "inbox" : "next",
-            urgency: task.urgency,
-            importance: task.importance,
-            due_at: next.toISOString(),
-            estimated_minutes: task.estimated_minutes,
-            energy: task.energy,
-            context_tags: task.context_tags,
-            recurrence_rule: task.recurrence_rule,
-            recurrence_parent_id: task.recurrence_parent_id ?? task.id,
-            sort_order: task.sort_order,
-          });
+      if (done && task.recurrence_rule) {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        const insert = nextOccurrenceInsert(task, user!.id);
+        if (insert) {
+          const { error: insertError } = await supabase.from("tasks").insert(insert);
           if (insertError) throw insertError;
         }
       }
@@ -1044,7 +1025,9 @@ export function useSearch(spaceId: string | undefined, term: string) {
         .from("tasks")
         .select("*")
         .eq("space_id", spaceId!)
-        .textSearch("search", term.trim().split(/\s+/).join(" & "))
+        // websearch_to_tsquery ANDs plain words and never throws on
+        // operator characters (&, |, !, parens) in user input.
+        .textSearch("search", term.trim(), { type: "websearch" })
         .limit(50);
       if (error) throw error;
       return data;

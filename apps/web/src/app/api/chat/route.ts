@@ -86,11 +86,16 @@ export async function POST(request: NextRequest) {
   }));
   messages.push({ role: "user", content: [{ type: "text", text: message }] });
 
-  await supabase.from("chat_messages").insert({
-    session_id: sessionId,
-    role: "user",
-    content: [{ type: "text", text: message }],
-  });
+  // Persistence failures shouldn't abort the turn, but silent history gaps
+  // make later turns incoherent — log them.
+  const persist = async (role: "user" | "assistant", content: unknown) => {
+    const { error } = await supabase
+      .from("chat_messages")
+      .insert({ session_id: sessionId, role, content });
+    if (error) console.error("Persisting chat message failed:", error.message);
+  };
+
+  await persist("user", [{ type: "text", text: message }]);
 
   const anthropic = new Anthropic({ apiKey });
   const toolCtx = { supabase, userId: user.id, spaceId };
@@ -111,11 +116,7 @@ export async function POST(request: NextRequest) {
 
       messages.push({ role: "assistant", content: response.content });
       newAssistantMessages.push(response.content);
-      await supabase.from("chat_messages").insert({
-        session_id: sessionId,
-        role: "assistant",
-        content: response.content,
-      });
+      await persist("assistant", response.content);
 
       if (response.stop_reason === "refusal") break;
       if (response.stop_reason === "pause_turn") continue;
@@ -148,11 +149,7 @@ export async function POST(request: NextRequest) {
       }
 
       messages.push({ role: "user", content: results });
-      await supabase.from("chat_messages").insert({
-        session_id: sessionId,
-        role: "user",
-        content: results,
-      });
+      await persist("user", results);
     }
 
     await supabase
