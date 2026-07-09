@@ -7,7 +7,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isDeferred,
-  nextOccurrence,
+  nextOccurrenceInsert,
   planDay,
   priorityScore,
   quadrant,
@@ -151,7 +151,12 @@ async function listTasks(ctx: ToolContext, input: ToolInput) {
   } else {
     query = query.eq("status", status);
   }
-  const { data, error } = await query.limit(200);
+  // Deterministic subset when the space exceeds the limit: nearest due
+  // dates (overdue included) first, then newest.
+  const { data, error } = await query
+    .order("due_at", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(200);
   if (error) throw new Error(error.message);
 
   const now = new Date();
@@ -251,31 +256,16 @@ async function completeTask(ctx: ToolContext, input: ToolInput) {
     .eq("id", task.id);
   if (error) throw new Error(error.message);
 
-  let nextDue: string | null = null;
-  if (task.recurrence_rule) {
-    const now = new Date();
-    const anchor = task.due_at ? new Date(task.due_at) : now;
-    const next = nextOccurrence(task.recurrence_rule, anchor, now);
-    if (next) {
-      nextDue = next.toISOString();
-      await ctx.supabase.from("tasks").insert({
-        space_id: task.space_id,
-        project_id: task.project_id,
-        created_by: ctx.userId,
-        title: task.title,
-        notes: task.notes,
-        status: "next",
-        urgency: task.urgency,
-        importance: task.importance,
-        due_at: nextDue,
-        estimated_minutes: task.estimated_minutes,
-        context_tags: task.context_tags,
-        recurrence_rule: task.recurrence_rule,
-        recurrence_parent_id: task.recurrence_parent_id ?? task.id,
-      });
+  const insert = nextOccurrenceInsert(task, ctx.userId);
+  if (insert) {
+    const { error: insertError } = await ctx.supabase.from("tasks").insert(insert);
+    if (insertError) {
+      throw new Error(
+        `Task completed, but scheduling the next occurrence failed: ${insertError.message}`
+      );
     }
   }
-  return { completed: task.title, next_occurrence: nextDue };
+  return { completed: task.title, next_occurrence: insert?.due_at ?? null };
 }
 
 async function listProjects(ctx: ToolContext) {

@@ -18,6 +18,17 @@ export async function GET(request: NextRequest) {
     );
   }
   const redirectUri = new URL("/api/google/callback", request.url).toString();
-  // The user id doubles as CSRF state; the callback re-checks the session.
-  return NextResponse.redirect(authUrl(redirectUri, user.id, creds));
+  // Unguessable per-request CSRF state, echoed back by Google and compared
+  // against this cookie in the callback. sameSite=lax still sends it on the
+  // top-level redirect back from accounts.google.com.
+  const state = crypto.randomUUID();
+  const response = NextResponse.redirect(authUrl(redirectUri, state, creds));
+  response.cookies.set("google_oauth_state", state, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/api/google",
+    maxAge: 600,
+  });
+  return response;
 }

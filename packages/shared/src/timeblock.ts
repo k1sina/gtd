@@ -117,8 +117,9 @@ export function planDay(
 
   for (const task of ordered) {
     if (blocks.length >= config.maxBlocks) break;
+    const estimate = task.estimated_minutes;
     const minutes = Math.min(
-      task.estimated_minutes ?? config.defaultBlockMinutes,
+      estimate && estimate > 0 ? estimate : config.defaultBlockMinutes,
       config.maxBlockMinutes
     );
     const needed = minutes * MIN_MS;

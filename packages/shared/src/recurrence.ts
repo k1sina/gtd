@@ -99,6 +99,9 @@ export function nextOccurrence(
     for (let i = 1; i <= 200; i++) {
       const candidate = new Date(anchor);
       candidate.setFullYear(anchor.getFullYear() + i * r.interval);
+      // setFullYear rolls a Feb 29 anchor into Mar 1 on non-leap years;
+      // clamp back to Feb 28 (the Swift engine's Calendar does the same).
+      if (candidate.getMonth() !== anchor.getMonth()) candidate.setDate(0);
       if (candidate > after) return candidate;
     }
     return null;

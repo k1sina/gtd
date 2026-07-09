@@ -74,6 +74,13 @@ describe("nextOccurrence", () => {
     );
   });
 
+  it("yearly clamps a Feb 29 anchor to Feb 28 in non-leap years", () => {
+    const leap = new Date("2028-02-29T09:00:00");
+    expect(nextOccurrence("FREQ=YEARLY;INTERVAL=1", leap)).toEqual(
+      new Date("2029-02-28T09:00:00")
+    );
+  });
+
   it("catches up when completed late: next occurrence is after `after`", () => {
     const lateCompletion = new Date("2026-07-20T15:00:00");
     expect(
