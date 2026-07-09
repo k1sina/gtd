@@ -3,7 +3,7 @@ import {
   getCalendarAccount,
   getValidAccessToken,
 } from "@/lib/calendar-account";
-import { insertEvent } from "@/lib/google";
+import { GoogleReauthRequiredError, insertEvent } from "@/lib/google";
 import { createApiContext } from "@/lib/supabase/api";
 
 /**
@@ -29,7 +29,18 @@ export async function POST(request: NextRequest) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const account = await getCalendarAccount(supabase);
-  const token = account ? await getValidAccessToken(supabase, account) : null;
+  // An expired Google connection shouldn't block confirming — blocks are
+  // confirmed without calendar sync and the response says why.
+  let token: string | null = null;
+  let calendarError: string | null = null;
+  if (account) {
+    try {
+      token = await getValidAccessToken(supabase, account);
+    } catch (err) {
+      if (!(err instanceof GoogleReauthRequiredError)) throw err;
+      calendarError = "google_reauth_required";
+    }
+  }
 
   const results = [];
   for (const block of blocks ?? []) {
@@ -56,5 +67,5 @@ export async function POST(request: NextRequest) {
     if (!updateError) results.push({ id: block.id, status });
   }
 
-  return NextResponse.json({ confirmed: results });
+  return NextResponse.json({ confirmed: results, calendarError });
 }

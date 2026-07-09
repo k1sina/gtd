@@ -18,7 +18,7 @@ import {
   getValidAccessToken,
   plannerConfig,
 } from "./calendar-account";
-import { listEvents } from "./google";
+import { GoogleReauthRequiredError, listEvents } from "./google";
 
 export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
   {
@@ -336,6 +336,7 @@ async function planToday(ctx: ToolContext) {
   const config = plannerConfig(account);
 
   const busy: Interval[] = [];
+  let calendarNote: string | null = null;
   if (account) {
     try {
       const token = await getValidAccessToken(ctx.supabase, account);
@@ -346,8 +347,11 @@ async function planToday(ctx: ToolContext) {
           busy.push({ start: new Date(e.start.dateTime), end: new Date(e.end.dateTime) });
         }
       }
-    } catch {
-      // plan without calendar
+    } catch (err) {
+      calendarNote =
+        err instanceof GoogleReauthRequiredError
+          ? "Google Calendar connection expired — tell the user to reconnect it in Settings. Planned without calendar events."
+          : "Calendar fetch failed — planned without calendar events.";
     }
   }
 
@@ -391,6 +395,7 @@ async function planToday(ctx: ToolContext) {
 
   return {
     calendar_connected: !!account,
+    ...(calendarNote ? { calendar_note: calendarNote } : {}),
     proposed_blocks: blocks.map((b) => ({
       task: b.title,
       start: b.start.toISOString(),

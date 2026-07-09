@@ -10,7 +10,7 @@ import {
   getValidAccessToken,
   plannerConfig,
 } from "@/lib/calendar-account";
-import { listEvents } from "@/lib/google";
+import { GoogleReauthRequiredError, listEvents } from "@/lib/google";
 import { createApiContext } from "@/lib/supabase/api";
 
 /**
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
 
   // Busy intervals: calendar events (when connected) + already-confirmed blocks.
   const busy: Interval[] = [];
+  let calendarError: string | null = null;
   if (account) {
     try {
       const token = await getValidAccessToken(supabase, account);
@@ -50,7 +51,11 @@ export async function POST(request: NextRequest) {
         }
       }
     } catch (err) {
-      console.error("Plan: calendar fetch failed, planning without events:", err);
+      if (err instanceof GoogleReauthRequiredError) {
+        calendarError = "google_reauth_required";
+      } else {
+        console.error("Plan: calendar fetch failed, planning without events:", err);
+      }
     }
   }
 
@@ -97,7 +102,7 @@ export async function POST(request: NextRequest) {
     .lt("starts_at", dayEnd.toISOString());
 
   if (blocks.length === 0) {
-    return NextResponse.json({ blocks: [], calendarConnected: !!account });
+    return NextResponse.json({ blocks: [], calendarConnected: !!account, calendarError });
   }
 
   const { data: inserted, error: insertError } = await supabase
@@ -119,5 +124,6 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     blocks: inserted.map((b, i) => ({ ...b, title: blocks[i]!.title })),
     calendarConnected: !!account,
+    calendarError,
   });
 }
