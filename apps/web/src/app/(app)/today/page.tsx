@@ -46,13 +46,20 @@ export default function TodayPage() {
 
   return (
     <div>
+      {/* suppressHydrationWarning: the server's locale can format this date
+          differently from the browser's; without it the mismatch makes React
+          throw away and re-render the whole page tree (and refetch everything). */}
       <PageHeader
         title="Today"
-        subtitle={now.toLocaleDateString([], {
-          weekday: "long",
-          month: "long",
-          day: "numeric",
-        })}
+        subtitle={
+          <span suppressHydrationWarning>
+            {now.toLocaleDateString([], {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+            })}
+          </span>
+        }
       />
 
       <HabitStrip />

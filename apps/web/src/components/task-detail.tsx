@@ -31,6 +31,8 @@ function fromLocalInput(value: string): string | null {
   return new Date(value).toISOString();
 }
 
+const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
 const RECURRENCE_PRESETS: { label: string; value: string }[] = [
   { label: "Doesn't repeat", value: "" },
   { label: "Every day", value: "FREQ=DAILY;INTERVAL=1" },
@@ -78,12 +80,10 @@ export function TaskDetail({
   const patch = (fields: Partial<Task>) =>
     updateTask.mutate({ id: live.id, ...fields });
 
+  const parsedRule = live.recurrence_rule ? parseRule(live.recurrence_rule) : null;
   const recurrencePreset =
     RECURRENCE_PRESETS.find(
-      (p) =>
-        p.value &&
-        live.recurrence_rule &&
-        formatRule(parseRule(live.recurrence_rule) ?? { freq: "DAILY", interval: 1 }) === p.value
+      (p) => p.value && parsedRule && formatRule(parsedRule) === p.value
     )?.value ?? (live.recurrence_rule ? "custom" : "");
 
   async function addSubtask() {
@@ -222,6 +222,45 @@ export function TaskDetail({
                 <option value="custom">Custom ({live.recurrence_rule})</option>
               )}
             </Select>
+            {parsedRule?.freq === "WEEKLY" && (
+              <span className="mt-1 flex items-center gap-1">
+                {WEEKDAY_LABELS.map((d, i) => {
+                  const days = parsedRule.byday ?? [];
+                  const on = days.includes(i);
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      title={d}
+                      onClick={() => {
+                        const next = on
+                          ? days.filter((x) => x !== i)
+                          : [...days, i].sort();
+                        patch({
+                          recurrence_rule: formatRule({
+                            ...parsedRule,
+                            byday: next.length > 0 ? next : undefined,
+                          }),
+                        });
+                      }}
+                      className={
+                        "h-6 w-6 rounded-full border text-[10px] font-medium cursor-pointer " +
+                        (on
+                          ? "border-accent bg-accent text-white"
+                          : "border-line bg-surface text-ink-soft hover:border-accent")
+                      }
+                    >
+                      {d[0]}
+                    </button>
+                  );
+                })}
+                {(parsedRule.byday ?? []).length === 0 && (
+                  <span className="ml-1 text-[10px] text-ink-faint">
+                    on the due date&apos;s weekday
+                  </span>
+                )}
+              </span>
+            )}
           </label>
 
           <label className="flex flex-col gap-1 text-xs text-ink-soft">
@@ -350,6 +389,11 @@ export function TaskDetail({
           variant="danger"
           size="sm"
           onClick={() => {
+            const message =
+              subtasks.length > 0
+                ? `Delete this task and its ${subtasks.length} subtask${subtasks.length === 1 ? "" : "s"}?`
+                : "Delete this task?";
+            if (!confirm(message)) return;
             deleteTask.mutate(live.id);
             onClose();
           }}
@@ -358,7 +402,7 @@ export function TaskDetail({
           Delete
         </Button>
         <Button size="sm" onClick={onClose}>
-          Done
+          Close
         </Button>
       </div>
     </Dialog>

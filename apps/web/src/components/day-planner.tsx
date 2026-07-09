@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { CalendarDays, Check, Sparkles, X } from "lucide-react";
 import Link from "next/link";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   useCalendarEvents,
   useConfirmPlan,
@@ -23,24 +23,54 @@ function timeLabel(iso: string): string {
   });
 }
 
+type PlanReason = "after_hours" | "no_candidates" | "no_free_slots";
+
+const REASON_TEXT: Record<PlanReason, string> = {
+  after_hours: "Your workday is over — nothing left to plan today.",
+  no_candidates:
+    "No open next actions to plan. Clarify your inbox or add tasks first.",
+  no_free_slots:
+    "No free slots left today — your calendar and blocks fill the day.",
+};
+
 /** Today's calendar events + suggested/confirmed focus blocks. */
 export function DayPlanner() {
   const { currentSpace } = useSpace();
   const todayKey = toDateKey(new Date());
+  const tomorrow = new Date();
+  tomorrow.setDate(tomorrow.getDate() + 1);
+  const tomorrowKey = toDateKey(tomorrow);
+
   const { data: calendar } = useCalendarEvents(todayKey);
   const { data: blocks = [] } = useTimeBlocks(todayKey);
+  const { data: tomorrowBlocks = [] } = useTimeBlocks(tomorrowKey);
   const { data: tasks = [] } = useTasks(currentSpace?.id);
   const planDay = usePlanDay();
   const confirmPlan = useConfirmPlan();
   const dismissPlan = useDismissPlan();
+  const [notice, setNotice] = useState<PlanReason | null>(null);
 
   const taskTitle = useMemo(() => {
     const map = new Map(tasks.map((t) => [t.id, t.title]));
     return (id: string | null) => (id ? (map.get(id) ?? "Focus block") : "Focus block");
   }, [tasks]);
 
+  function plan(dateKey: string) {
+    if (!currentSpace) return;
+    setNotice(null);
+    planDay.mutate(
+      { spaceId: currentSpace.id, dateKey },
+      {
+        onSuccess: (data) => {
+          if (data.blocks?.length === 0 && data.reason) setNotice(data.reason);
+        },
+      }
+    );
+  }
+
   const suggested = blocks.filter((b) => b.status === "suggested");
   const planned = blocks.filter((b) => b.status !== "suggested");
+  const tomorrowSuggested = tomorrowBlocks.filter((b) => b.status === "suggested");
 
   type Item = {
     id: string;
@@ -109,10 +139,7 @@ export function DayPlanner() {
             <Button
               size="sm"
               disabled={planDay.isPending || !currentSpace}
-              onClick={() =>
-                currentSpace &&
-                planDay.mutate({ spaceId: currentSpace.id, dateKey: todayKey })
-              }
+              onClick={() => plan(todayKey)}
             >
               <Sparkles size={13} />
               {planDay.isPending ? "Planning…" : "Plan my day"}
@@ -122,7 +149,7 @@ export function DayPlanner() {
       </div>
 
       {calendar?.reauthRequired && (
-        <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800">
+        <p className="mb-2 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-xs text-amber-800 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
           Google Calendar connection expired —{" "}
           <Link href="/settings" className="font-medium underline">
             reconnect in Settings
@@ -130,6 +157,19 @@ export function DayPlanner() {
           to see events and sync blocks.
         </p>
       )}
+
+      {notice && (
+        <div className="mb-2 flex flex-wrap items-center gap-2 rounded-md border border-line bg-canvas/60 px-2.5 py-1.5 text-xs text-ink-soft">
+          <span>{REASON_TEXT[notice]}</span>
+          {notice === "after_hours" && (
+            <Button size="sm" onClick={() => plan(tomorrowKey)} disabled={planDay.isPending}>
+              <Sparkles size={12} />
+              Plan tomorrow instead
+            </Button>
+          )}
+        </div>
+      )}
+
       {!showCard || items.length === 0 ? (
         <p className="text-xs text-ink-faint">
           {calendar?.connected
@@ -173,6 +213,54 @@ export function DayPlanner() {
             </li>
           ))}
         </ul>
+      )}
+
+      {tomorrowBlocks.length > 0 && (
+        <div className="mt-3 border-t border-line pt-2">
+          <div className="mb-1 flex items-center justify-between">
+            <h3 className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+              Tomorrow
+            </h3>
+            {tomorrowSuggested.length > 0 && (
+              <div className="flex items-center gap-1.5">
+                <Button
+                  size="sm"
+                  variant="primary"
+                  disabled={confirmPlan.isPending}
+                  onClick={() => confirmPlan.mutate(tomorrowSuggested.map((b) => b.id))}
+                >
+                  <Check size={12} /> Confirm
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => dismissPlan.mutate(tomorrowKey)}>
+                  <X size={12} /> Dismiss
+                </Button>
+              </div>
+            )}
+          </div>
+          <ul className="flex flex-col gap-1">
+            {tomorrowBlocks.map((b) => (
+              <li
+                key={b.id}
+                className={clsx(
+                  "flex items-center gap-2.5 rounded-md border px-2.5 py-1.5 text-sm",
+                  b.status === "suggested"
+                    ? "border-dashed border-accent/50 bg-accent-soft/30"
+                    : "border-accent/30 bg-accent-soft/50"
+                )}
+              >
+                <span className="w-28 shrink-0 text-xs tabular-nums text-ink-soft">
+                  {timeLabel(b.starts_at)} – {timeLabel(b.ends_at)}
+                </span>
+                <span className="truncate">⚡ {taskTitle(b.task_id)}</span>
+                {b.status === "suggested" && (
+                  <span className="ml-auto text-[10px] font-medium uppercase text-accent">
+                    proposed
+                  </span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

@@ -141,11 +141,25 @@ export function useDeleteTask() {
  * next occurrence with the same attributes and a due date computed from the
  * recurrence rule.
  */
+export interface CompletionReceipt {
+  /** What to restore on undo. */
+  previousStatus: TaskStatus;
+  previousCompletedAt: string | null;
+  /** The recurrence occurrence spawned by this completion, if any. */
+  spawnedId: string | null;
+}
+
 export function useCompleteTask() {
   const supabase = createClient();
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ task, done }: { task: Task; done: boolean }) => {
+    mutationFn: async ({
+      task,
+      done,
+    }: {
+      task: Task;
+      done: boolean;
+    }): Promise<CompletionReceipt> => {
       const { error } = await supabase
         .from("tasks")
         .update({
@@ -155,16 +169,27 @@ export function useCompleteTask() {
         .eq("id", task.id);
       if (error) throw error;
 
+      let spawnedId: string | null = null;
       if (done && task.recurrence_rule) {
         const {
           data: { user },
         } = await supabase.auth.getUser();
         const insert = nextOccurrenceInsert(task, user!.id);
         if (insert) {
-          const { error: insertError } = await supabase.from("tasks").insert(insert);
+          const { data: spawned, error: insertError } = await supabase
+            .from("tasks")
+            .insert(insert)
+            .select("id")
+            .single();
           if (insertError) throw insertError;
+          spawnedId = spawned.id;
         }
       }
+      return {
+        previousStatus: task.status,
+        previousCompletedAt: task.completed_at,
+        spawnedId,
+      };
     },
     onMutate: async ({ task, done }) => {
       await qc.cancelQueries({ queryKey: ["tasks", task.space_id] });
@@ -188,6 +213,35 @@ export function useCompleteTask() {
     },
     onError: (_e, _v, ctx) => {
       if (ctx?.prev) qc.setQueryData(ctx.key, ctx.prev);
+    },
+    onSettled: (_d, _e, { task }) =>
+      qc.invalidateQueries({ queryKey: ["tasks", task.space_id] }),
+  });
+}
+
+/** Reverses a completion: restores the task and removes any spawned occurrence. */
+export function useUndoComplete() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      task,
+      receipt,
+    }: {
+      task: Task;
+      receipt: CompletionReceipt;
+    }) => {
+      const { error } = await supabase
+        .from("tasks")
+        .update({
+          status: receipt.previousStatus,
+          completed_at: receipt.previousCompletedAt,
+        })
+        .eq("id", task.id);
+      if (error) throw error;
+      if (receipt.spawnedId) {
+        await supabase.from("tasks").delete().eq("id", receipt.spawnedId);
+      }
     },
     onSettled: (_d, _e, { task }) =>
       qc.invalidateQueries({ queryKey: ["tasks", task.space_id] }),

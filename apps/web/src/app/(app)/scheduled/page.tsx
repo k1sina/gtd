@@ -31,12 +31,23 @@ export default function ScheduledPage() {
     const tomorrow = addDays(today, 1);
     const nextWeek = addDays(today, 7);
 
+    // Tasks whose only date is a future defer_until are snoozed — they're
+    // hidden from action lists, so show them separately from date-bound work.
+    const snoozed = open
+      .filter((t) => !t.due_at && new Date(t.defer_until!) > now)
+      .sort(
+        (a, b) =>
+          new Date(a.defer_until!).getTime() - new Date(b.defer_until!).getTime()
+      );
+    const dated = open.filter((t) => !snoozed.includes(t));
+
     const at = (t: (typeof open)[number]) => new Date(t.due_at ?? t.defer_until!);
     return {
-      overdue: open.filter((t) => at(t) < today),
-      today: open.filter((t) => at(t) >= today && at(t) < tomorrow),
-      week: open.filter((t) => at(t) >= tomorrow && at(t) < nextWeek),
-      later: open.filter((t) => at(t) >= nextWeek),
+      overdue: dated.filter((t) => at(t) < today),
+      today: dated.filter((t) => at(t) >= today && at(t) < tomorrow),
+      week: dated.filter((t) => at(t) >= tomorrow && at(t) < nextWeek),
+      later: dated.filter((t) => at(t) >= nextWeek),
+      snoozed,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks]);
@@ -46,6 +57,7 @@ export default function ScheduledPage() {
     ["Today", groups.today],
     ["Next 7 days", groups.week],
     ["Later", groups.later],
+    ["Snoozed", groups.snoozed],
   ];
 
   const empty = sections.every(([, list]) => list.length === 0);

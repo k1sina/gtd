@@ -146,7 +146,7 @@ export default function AssistantPage() {
                 "group flex items-center gap-1 rounded-md px-2 py-1.5 text-xs cursor-pointer",
                 s.id === sessionId
                   ? "bg-accent-soft font-medium text-accent"
-                  : "text-ink-soft hover:bg-black/5"
+                  : "text-ink-soft hover:bg-ink/5"
               )}
               onClick={() => setSessionId(s.id)}
             >

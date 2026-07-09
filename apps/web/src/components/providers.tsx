@@ -2,6 +2,7 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useState } from "react";
+import { ToastProvider } from "@/components/toast";
 import { SpaceProvider } from "@/lib/space-context";
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -20,7 +21,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <SpaceProvider>{children}</SpaceProvider>
+      <SpaceProvider>
+        <ToastProvider>{children}</ToastProvider>
+      </SpaceProvider>
     </QueryClientProvider>
   );
 }

@@ -21,10 +21,12 @@ function ProjectCard({
   taskStats,
 }: {
   project: Project;
-  taskStats: { open: number; done: number };
+  taskStats: { open: number; done: number; next: number };
 }) {
   const total = taskStats.open + taskStats.done;
   const pct = total > 0 ? Math.round((taskStats.done / total) * 100) : 0;
+  // GTD: every active project needs a next action, or it silently stalls.
+  const stalled = project.status === "active" && taskStats.next === 0;
   return (
     <Link
       href={`/projects/${project.id}`}
@@ -32,8 +34,16 @@ function ProjectCard({
     >
       <div className="flex items-start justify-between gap-2">
         <h3 className="font-medium leading-snug">{project.name}</h3>
+        {stalled && (
+          <span
+            title="No next action — decide the next step"
+            className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600"
+          >
+            stalled
+          </span>
+        )}
         {project.status !== "active" && (
-          <span className="rounded-full bg-black/5 px-2 py-0.5 text-[10px] text-ink-soft">
+          <span className="rounded-full bg-ink/5 px-2 py-0.5 text-[10px] text-ink-soft">
             {project.status.replace("_", " ")}
           </span>
         )}
@@ -42,7 +52,7 @@ function ProjectCard({
         <p className="line-clamp-2 text-xs text-ink-soft">{project.outcome}</p>
       )}
       <div className="mt-auto flex items-center gap-2">
-        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-black/5">
+        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink/5">
           <div
             className={clsx(
               "h-full rounded-full",
@@ -74,12 +84,15 @@ export default function ProjectsPage() {
   const [newAreaName, setNewAreaName] = useState("");
 
   const statsByProject = useMemo(() => {
-    const stats = new Map<string, { open: number; done: number }>();
+    const stats = new Map<string, { open: number; done: number; next: number }>();
     for (const t of tasks) {
       if (!t.project_id || t.parent_task_id) continue;
-      const s = stats.get(t.project_id) ?? { open: 0, done: 0 };
+      const s = stats.get(t.project_id) ?? { open: 0, done: 0, next: 0 };
       if (t.status === "done") s.done += 1;
-      else if (t.status !== "cancelled") s.open += 1;
+      else if (t.status !== "cancelled") {
+        s.open += 1;
+        if (t.status === "next") s.next += 1;
+      }
       stats.set(t.project_id, s);
     }
     return stats;
@@ -158,12 +171,12 @@ export default function ProjectsPage() {
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
                 {area}
               </h2>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 {list.map((p) => (
                   <ProjectCard
                     key={p.id}
                     project={p}
-                    taskStats={statsByProject.get(p.id) ?? { open: 0, done: 0 }}
+                    taskStats={statsByProject.get(p.id) ?? { open: 0, done: 0, next: 0 }}
                   />
                 ))}
               </div>
@@ -174,12 +187,12 @@ export default function ProjectsPage() {
               <h2 className="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-faint">
                 Someday · on hold · finished
               </h2>
-              <div className="grid grid-cols-2 gap-3 opacity-70">
+              <div className="grid grid-cols-1 gap-3 opacity-70 sm:grid-cols-2">
                 {other.map((p) => (
                   <ProjectCard
                     key={p.id}
                     project={p}
-                    taskStats={statsByProject.get(p.id) ?? { open: 0, done: 0 }}
+                    taskStats={statsByProject.get(p.id) ?? { open: 0, done: 0, next: 0 }}
                   />
                 ))}
               </div>

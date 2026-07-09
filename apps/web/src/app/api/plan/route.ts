@@ -93,6 +93,17 @@ export async function POST(request: NextRequest) {
 
   const blocks = planDay(candidates, busy, dayStart, config, now);
 
+  // When nothing could be planned, say why so the UI isn't a silent no-op.
+  let reason: "after_hours" | "no_candidates" | "no_free_slots" | null = null;
+  if (blocks.length === 0) {
+    const [endH = 17, endM = 0] = config.workEnd.split(":").map((n) => parseInt(n, 10));
+    const windowEnd = new Date(dayStart);
+    windowEnd.setHours(endH, endM, 0, 0);
+    if (now >= windowEnd) reason = "after_hours";
+    else if (candidates.length === 0) reason = "no_candidates";
+    else reason = "no_free_slots";
+  }
+
   // Replace previous suggestions for this day.
   await supabase
     .from("time_blocks")
@@ -102,7 +113,12 @@ export async function POST(request: NextRequest) {
     .lt("starts_at", dayEnd.toISOString());
 
   if (blocks.length === 0) {
-    return NextResponse.json({ blocks: [], calendarConnected: !!account, calendarError });
+    return NextResponse.json({
+      blocks: [],
+      calendarConnected: !!account,
+      calendarError,
+      reason,
+    });
   }
 
   const { data: inserted, error: insertError } = await supabase
