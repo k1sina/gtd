@@ -21,7 +21,7 @@ export function Button({
         variant === "default" &&
           "border border-line bg-surface hover:bg-canvas text-ink",
         variant === "primary" && "bg-accent text-white hover:bg-indigo-700",
-        variant === "ghost" && "text-ink-soft hover:bg-black/5 hover:text-ink",
+        variant === "ghost" && "text-ink-soft hover:bg-ink/5 hover:text-ink",
         variant === "danger" &&
           "border border-red-200 bg-surface text-red-600 hover:bg-red-50",
         className
@@ -87,7 +87,7 @@ export function Badge({
     <span
       className={clsx(
         "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium whitespace-nowrap",
-        tone === "neutral" && "bg-black/5 text-ink-soft",
+        tone === "neutral" && "bg-ink/5 text-ink-soft",
         tone === "accent" && "bg-accent-soft text-accent",
         tone === "red" && "bg-red-50 text-red-600",
         tone === "blue" && "bg-blue-50 text-blue-600",
@@ -142,7 +142,7 @@ export function Dialog({
             <button
               onClick={onClose}
               aria-label="Close"
-              className="rounded p-1 text-ink-faint hover:bg-black/5 hover:text-ink cursor-pointer"
+              className="rounded p-1 text-ink-faint hover:bg-ink/5 hover:text-ink cursor-pointer"
             >
               <X size={16} />
             </button>

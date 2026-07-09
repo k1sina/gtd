@@ -27,7 +27,7 @@ const STATUS_STYLE: Record<GoalStatus, string> = {
   active: "bg-accent-soft text-accent",
   achieved: "bg-emerald-50 text-emerald-700",
   partial: "bg-amber-50 text-amber-700",
-  dropped: "bg-black/5 text-ink-faint line-through",
+  dropped: "bg-ink/5 text-ink-faint line-through",
 };
 
 export default function GoalsPage() {

@@ -13,6 +13,7 @@ import {
   Inbox,
   LayoutList,
   LogOut,
+  Menu,
   Moon,
   Plus,
   RefreshCcw,
@@ -66,6 +67,12 @@ export function AppShell({
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [spaceMenuOpen, setSpaceMenuOpen] = useState(false);
   const [newSpaceOpen, setNewSpaceOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Navigating (mobile) closes the drawer.
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   const inboxCount = useMemo(
     () => tasks.filter((t) => t.status === "inbox" && !t.parent_task_id).length,
@@ -100,7 +107,41 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen">
-      <aside className="fixed inset-y-0 left-0 flex w-60 flex-col border-r border-line bg-surface">
+      {/* Mobile top bar */}
+      <header className="fixed inset-x-0 top-0 z-30 flex h-12 items-center gap-2 border-b border-line bg-surface px-3 md:hidden">
+        <button
+          onClick={() => setSidebarOpen(true)}
+          aria-label="Open menu"
+          className="rounded p-1.5 text-ink-soft hover:bg-canvas cursor-pointer"
+        >
+          <Menu size={18} />
+        </button>
+        <span className="flex-1 truncate text-sm font-semibold">
+          {currentSpace?.name ?? "Clarity"}
+        </span>
+        <button
+          onClick={() => setQuickAddOpen(true)}
+          aria-label="Add to inbox"
+          className="rounded p-1.5 text-accent hover:bg-accent-soft cursor-pointer"
+        >
+          <Plus size={18} />
+        </button>
+      </header>
+
+      {/* Backdrop for the mobile drawer */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      <aside
+        className={clsx(
+          "fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-line bg-surface transition-transform md:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
         {/* Space switcher */}
         <div className="relative border-b border-line p-3">
           <button
@@ -118,6 +159,12 @@ export function AppShell({
             </span>
             <ChevronDown size={14} className="text-ink-faint" />
           </button>
+          {spaceMenuOpen && (
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setSpaceMenuOpen(false)}
+            />
+          )}
           {spaceMenuOpen && (
             <div className="absolute left-3 right-3 top-full z-20 mt-1 rounded-lg border border-line bg-surface p-1 shadow-lg">
               {spaces.map((s) => (
@@ -213,8 +260,8 @@ export function AppShell({
         </div>
       </aside>
 
-      <main className="ml-60 flex-1">
-        <div className="mx-auto max-w-3xl px-6 py-8">{children}</div>
+      <main className="flex-1 pt-12 md:ml-60 md:pt-0">
+        <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-8">{children}</div>
       </main>
 
       {quickAddOpen && <QuickAdd onClose={() => setQuickAddOpen(false)} />}
