@@ -154,9 +154,12 @@ link; on iPhone the switcher is in each tab's toolbar).
   flow as the web.
 
 ### Next
-- Every next action, highest leverage first. The colored dot is the
-  Eisenhower quadrant (red = do first, blue = schedule, orange = delegate,
-  gray = eliminate). Deferred tasks are dimmed until their defer date.
+- Every next action in your manual order; tasks you haven't placed rank by
+  leverage. The colored dot is the Eisenhower quadrant (red = do first,
+  blue = schedule, orange = delegate, gray = eliminate). Deferred tasks are
+  dimmed until their defer date.
+- Drag rows to reorder (long-press on iPhone, or tap **Edit** for handles;
+  plain drag on Mac). Reordering is disabled while filters are active.
 - Filter chips narrow by `@context` tag and energy level.
 
 ### Scheduled / Waiting / Someday (Browse tab on iPhone)
@@ -164,13 +167,15 @@ link; on iPhone the switcher is in each tab's toolbar).
   7 days, Later.
 - **Waiting for** lists delegated items (swipe right when they land back on
   your plate).
-- **Someday/maybe** parks ideas; swipe right to activate.
+- **Someday/maybe** parks ideas; swipe right to activate, drag to reorder.
 
 ### Projects = tasks with subtasks
 - There is no separate Projects screen: any task with subtasks IS a project.
   Open a task's editor to add subtasks (nesting allowed), give it an
   **outcome** ("what does done look like?"), and watch for the red
   **stalled** label in lists when no subtask is an actionable next step.
+  Drag subtasks to reorder them — the first actionable one is what
+  surfaces as the parent's action line in Today/Next.
 
 ### Habits, Reviews, Goals, Assistant, Search
 - **Priority** — the Eisenhower matrix lives in the task editor as a

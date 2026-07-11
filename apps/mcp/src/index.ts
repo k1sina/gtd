@@ -98,7 +98,7 @@ server.registerTool(
   "update_task",
   {
     description:
-      "Update fields on an existing task: reprioritise (urgency/importance), reschedule (due_at), change status, nest it under a parent task, edit title/notes/outcome. Get the task id from list_tasks first.",
+      "Update fields on an existing task: reprioritise (urgency/importance), reschedule (due_at), change status, nest it under a parent task, edit title/notes/outcome, or move it in a manually ordered list (sort_order). Get the task id from list_tasks first.",
     inputSchema: {
       task_id: z.string(),
       title: z.string().optional(),
@@ -117,6 +117,12 @@ server.registerTool(
         .describe("Move under this parent task, or empty string to make top-level"),
       estimated_minutes: z.number().optional(),
       waiting_on: z.string().optional(),
+      sort_order: z
+        .number()
+        .optional()
+        .describe(
+          "Manual list position — lists sort ascending by this before priority; pick a value between the neighbours' sort_order (fractions allowed)"
+        ),
     },
   },
   handler("update_task")

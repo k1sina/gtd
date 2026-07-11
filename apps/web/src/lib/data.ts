@@ -10,7 +10,7 @@ import type {
   Task,
   TaskStatus,
 } from "@gtd/shared";
-import { nextOccurrenceInsert } from "@gtd/shared";
+import { nextOccurrenceInsert, type OrderPatch } from "@gtd/shared";
 import {
   useMutation,
   useQuery,
@@ -119,6 +119,55 @@ export function useUpdateTask() {
     onSettled: (task) => {
       if (task) qc.invalidateQueries({ queryKey: ["tasks", task.space_id] });
     },
+  });
+}
+
+/**
+ * Persist drag-and-drop ordering: bulk sort_order writes via the
+ * reorder_tasks RPC (one round trip even when a never-ordered list gets
+ * renumbered), applied optimistically so the row settles where it was
+ * dropped.
+ */
+export function useReorderTasks() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      patches,
+    }: {
+      spaceId: string;
+      patches: OrderPatch[];
+    }) => {
+      const { error } = await supabase.rpc("reorder_tasks", {
+        p_ids: patches.map((p) => p.id),
+        p_orders: patches.map((p) => p.sort_order),
+      });
+      if (error) throw error;
+    },
+    onMutate: async ({ patches }) => {
+      await qc.cancelQueries({ queryKey: ["tasks"] });
+      const orderById = new Map(patches.map((p) => [p.id, p.sort_order]));
+      const snapshots = qc.getQueriesData<Task[]>({ queryKey: ["tasks"] });
+      for (const [key, tasks] of snapshots) {
+        if (!tasks) continue;
+        qc.setQueryData(
+          key,
+          tasks.map((t) =>
+            orderById.has(t.id)
+              ? { ...t, sort_order: orderById.get(t.id)! }
+              : t
+          )
+        );
+      }
+      return { snapshots };
+    },
+    onError: (_e, _v, ctx) => {
+      for (const [key, tasks] of ctx?.snapshots ?? []) {
+        qc.setQueryData(key, tasks);
+      }
+    },
+    onSettled: (_data, _error, { spaceId }) =>
+      qc.invalidateQueries({ queryKey: ["tasks", spaceId] }),
   });
 }
 

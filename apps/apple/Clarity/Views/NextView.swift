@@ -20,7 +20,11 @@ struct NextView: View {
         let now = Date()
         return allTasks
             .filter { $0.parentTaskId == nil && $0.status == .next && !isDeferred($0, now: now) }
-            .sorted { priorityScore($0, now: now) > priorityScore($1, now: now) }
+            .sorted(by: userOrder(now: now))
+    }
+
+    private var filtersActive: Bool {
+        tagFilter != nil || energyFilter != nil
     }
 
     private var allTags: [String] {
@@ -64,9 +68,11 @@ struct NextView: View {
                         editing = task
                     }
                 }
+                // Reordering a filtered subset would scramble hidden rows.
+                .onMove(perform: filtersActive ? nil : moveRows)
             } footer: {
                 if !ranked.isEmpty {
-                    Text("Ranked by importance, urgency, and due date.")
+                    Text("Drag to set your order; unplaced tasks rank by importance, urgency, and due date.")
                 }
             }
         }
@@ -75,11 +81,41 @@ struct NextView: View {
         .task(id: session.reloadKey) { await load() }
         #if os(iOS)
         .toolbar {
+            // EditButton exposes reorder handles for anyone who prefers them
+            // over long-press dragging.
+            ToolbarItem(placement: .topBarTrailing) {
+                if !filtersActive && ranked.count > 1 { EditButton() }
+            }
             ToolbarItem(placement: .topBarTrailing) { SpaceSwitcherMenu() }
         }
         #endif
         .sheet(item: $editing) { task in
             TaskEditView(task: task) { await load() }
+        }
+    }
+
+    /// Persist a drag: indices are into `filtered`, which equals the full
+    /// ranked list whenever reordering is enabled (filters disable onMove).
+    private func moveRows(from source: IndexSet, to destination: Int) {
+        guard let first = source.first else { return }
+        let target = destination > first ? destination - 1 : destination
+        let patches = reorderPatches(filtered, from: first, to: target)
+        guard !patches.isEmpty else { return }
+        // Optimistic: settle rows locally before the round trip.
+        let orders = Dictionary(uniqueKeysWithValues: patches.map { ($0.id, $0.sortOrder) })
+        for index in allTasks.indices {
+            if let order = orders[allTasks[index].id] {
+                allTasks[index].sortOrder = order
+            }
+        }
+        Task {
+            do {
+                let ctx = try session.requireContext()
+                try await TaskRepository(ctx).reorder(patches)
+            } catch {
+                self.error = error.localizedDescription
+            }
+            await load()
         }
     }
 

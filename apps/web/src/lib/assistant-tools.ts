@@ -85,7 +85,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
   {
     name: "update_task",
     description:
-      "Update fields on an existing task: reprioritise (urgency/importance), reschedule (due_at), change status, nest it under a parent task, edit title/notes/outcome. Get the task id from list_tasks first.",
+      "Update fields on an existing task: reprioritise (urgency/importance), reschedule (due_at), change status, nest it under a parent task, edit title/notes/outcome, or move it in a manually ordered list (sort_order). Get the task id from list_tasks first.",
     input_schema: {
       type: "object",
       properties: {
@@ -107,6 +107,11 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
         },
         estimated_minutes: { type: "number" },
         waiting_on: { type: "string" },
+        sort_order: {
+          type: "number",
+          description:
+            "Manual list position — lists sort ascending by this before priority; pick a value between the neighbours' sort_order (fractions allowed)",
+        },
       },
       required: ["task_id"],
     },
@@ -179,8 +184,16 @@ async function listTasks(ctx: ToolContext, input: ToolInput) {
     tasks = tasks.filter((t) => t.due_at && new Date(t.due_at) <= cutoff);
   }
 
-  return tasks
-    .sort((a, b) => priorityScore(b, now) - priorityScore(a, now))
+  // Subtask listings follow the surfacing order (sort_order, created_at);
+  // top-level listings stay ranked by leverage.
+  const sorted = input.parent_task_id
+    ? tasks.sort(
+        (a, b) =>
+          a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)
+      )
+    : tasks.sort((a, b) => priorityScore(b, now) - priorityScore(a, now));
+
+  return sorted
     .map((t) => ({
       id: t.id,
       title: t.title,
@@ -197,6 +210,7 @@ async function listTasks(ctx: ToolContext, input: ToolInput) {
       outcome: t.outcome,
       has_subtasks: (openChildCounts.get(t.id) ?? 0) > 0,
       stalled: isStalledParent(t, all, now),
+      sort_order: t.sort_order,
       notes: t.notes?.slice(0, 200) ?? null,
     }));
 }
@@ -237,6 +251,7 @@ async function updateTask(ctx: ToolContext, input: ToolInput) {
     "importance",
     "estimated_minutes",
     "waiting_on",
+    "sort_order",
   ]) {
     if (input[key] !== undefined) patch[key] = input[key];
   }

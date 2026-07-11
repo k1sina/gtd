@@ -1,6 +1,6 @@
 "use client";
 
-import { byPriority, isDeferred, type Energy } from "@gtd/shared";
+import { byUserOrder, isDeferred, type Energy } from "@gtd/shared";
 import clsx from "clsx";
 import { LayoutList } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -24,7 +24,7 @@ export default function NextPage() {
           (t) =>
             t.status === "next" && !t.parent_task_id && !isDeferred(t, now)
         )
-        .sort(byPriority(now)),
+        .sort(byUserOrder(now)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tasks]
   );
@@ -44,7 +44,7 @@ export default function NextPage() {
     <div>
       <PageHeader
         title="Next actions"
-        subtitle="Everything you could do next, highest leverage first"
+        subtitle="Everything you could do next — drag into your own order; unplaced tasks rank by leverage"
       />
 
       {(allTags.length > 0 || nextTasks.some((t) => t.energy)) && (
@@ -83,6 +83,8 @@ export default function NextPage() {
 
       <TaskList
         tasks={filtered}
+        // Reordering a filtered subset would scramble hidden rows.
+        reorderable={!tag && !energy}
         emptyState={
           <EmptyState
             icon={<LayoutList size={22} />}

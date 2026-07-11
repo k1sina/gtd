@@ -1,27 +1,32 @@
 "use client";
 
 import type { Task } from "@gtd/shared";
-import { firstActionableSubtask, isStalledParent } from "@gtd/shared";
+import { firstActionableSubtask, isStalledParent, reorderPatches } from "@gtd/shared";
 import { useMemo, useState } from "react";
-import { useTasks } from "@/lib/data";
+import { useReorderTasks, useTasks } from "@/lib/data";
 import { useSpace } from "@/lib/space-context";
+import { SortableList } from "./sortable-list";
 import { TaskDetail } from "./task-detail";
 import { TaskRow } from "./task-row";
 
 /**
  * Renders top-level tasks with selection + detail editing. Subtask counts,
  * the surfaced next-action subtask, and the stalled flag are derived from
- * the full task cache.
+ * the full task cache. With `reorderable`, rows get a drag handle and drops
+ * persist sort_order (pass it only when `tasks` is sorted by byUserOrder).
  */
 export function TaskList({
   tasks,
   emptyState,
+  reorderable = false,
 }: {
   tasks: Task[];
   emptyState?: React.ReactNode;
+  reorderable?: boolean;
 }) {
   const { currentSpace } = useSpace();
   const { data: allTasks = [] } = useTasks(currentSpace?.id);
+  const reorderTasks = useReorderTasks();
   const [selected, setSelected] = useState<Task | null>(null);
 
   const subtaskStats = useMemo(() => {
@@ -57,20 +62,34 @@ export function TaskList({
 
   if (tasks.length === 0 && emptyState) return <>{emptyState}</>;
 
+  const row = (task: Task) => (
+    <TaskRow
+      key={task.id}
+      task={task}
+      subtaskStats={subtaskStats.get(task.id)}
+      actionSubtask={surfacing.get(task.id)?.actionSubtask ?? null}
+      stalled={surfacing.get(task.id)?.stalled ?? false}
+      onOpen={setSelected}
+    />
+  );
+
+  function handleMove(from: number, to: number) {
+    if (!currentSpace) return;
+    const patches = reorderPatches(tasks, from, to);
+    if (patches.length > 0) {
+      reorderTasks.mutate({ spaceId: currentSpace.id, patches });
+    }
+  }
+
   return (
     <>
-      <div className="flex flex-col gap-0.5">
-        {tasks.map((task) => (
-          <TaskRow
-            key={task.id}
-            task={task}
-            subtaskStats={subtaskStats.get(task.id)}
-            actionSubtask={surfacing.get(task.id)?.actionSubtask ?? null}
-            stalled={surfacing.get(task.id)?.stalled ?? false}
-            onOpen={setSelected}
-          />
-        ))}
-      </div>
+      {reorderable ? (
+        <SortableList items={tasks} onMove={handleMove}>
+          {row}
+        </SortableList>
+      ) : (
+        <div className="flex flex-col gap-0.5">{tasks.map(row)}</div>
+      )}
       {selected && (
         <TaskDetail
           key={selected.id}
