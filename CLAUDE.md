@@ -15,7 +15,9 @@ SwiftUI apps for iPhone/Mac/Watch with Siri App Intents, and an MCP server.
   run `xcodegen generate` — never edit `Clarity.xcodeproj`.
 - `apps/mcp` — MCP stdio server mirroring the web assistant's 7 tools
   (`apps/web/src/lib/assistant-tools.ts`); keep the two in sync. Config via
-  `apps/mcp/.env` (gitignored), registered in root `.mcp.json`.
+  `apps/mcp/.env` (gitignored), registered in root `.mcp.json`. A remote MCP
+  endpoint (`apps/web/src/app/api/mcp/route.ts`, Streamable HTTP, Basic auth
+  = Supabase email/password) reuses `assistant-tools.ts` directly.
 - `packages/shared` — pure TS domain logic: priority scoring (Eisenhower),
   RRULE-subset recurrence engine, natural-language quick-add parser, DB row
   types. No runtime deps.

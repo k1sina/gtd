@@ -2,6 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function proxy(request: NextRequest) {
+  // The MCP endpoint authenticates with an Authorization header, not the
+  // session cookie — a login redirect would break every MCP client.
+  if (request.nextUrl.pathname.startsWith("/api/mcp")) {
+    return NextResponse.next({ request });
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
