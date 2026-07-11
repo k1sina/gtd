@@ -13,7 +13,8 @@ with a partner.
 - **Clarify** — guided inbox triage: 2-minute rule, next action, waiting-for,
   someday, convert to project (a task with subtasks IS a project), trash
 - **Organize** — nested subtasks with desired outcomes and stalled detection,
-  context tags, energy levels, defer dates
+  context tags, energy levels, defer dates; drag-and-drop ordering of next
+  actions, someday items, and subtasks on every platform
 - **Engage** — Today view and Next Actions (filter by context/energy) that
   surface each project's next actionable subtask; optional Eisenhower
   urgency × importance rating per task

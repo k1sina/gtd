@@ -1,13 +1,21 @@
 "use client";
 
 import type { Task, TaskStatus } from "@gtd/shared";
-import { formatRule, isRatedPriority, parseRule, QUADRANT_LABELS, quadrant } from "@gtd/shared";
+import {
+  formatRule,
+  isRatedPriority,
+  parseRule,
+  QUADRANT_LABELS,
+  quadrant,
+  reorderPatches,
+} from "@gtd/shared";
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   useAddTaskComment,
   useCreateTask,
   useDeleteTask,
+  useReorderTasks,
   useSpaceMembers,
   useTaskComments,
   useTasks,
@@ -15,6 +23,7 @@ import {
 } from "@/lib/data";
 import { useSpace } from "@/lib/space-context";
 import { PriorityMatrix } from "./priority-matrix";
+import { SortableList } from "./sortable-list";
 import { TaskRow } from "./task-row";
 import { Button, Dialog, Input, Select, Textarea } from "./ui";
 
@@ -57,6 +66,7 @@ export function TaskDetail({
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
   const createTask = useCreateTask();
+  const reorderTasks = useReorderTasks();
   const addComment = useAddTaskComment();
 
   const [title, setTitle] = useState(task.title);
@@ -74,9 +84,13 @@ export function TaskDetail({
     [allTasks, task]
   );
 
+  // Same order as the subtask surfacing walk (sort_order, then created_at).
   const subtasks = allTasks
     .filter((t) => t.parent_task_id === live.id)
-    .sort((a, b) => a.sort_order - b.sort_order);
+    .sort(
+      (a, b) =>
+        a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)
+    );
 
   const patch = (fields: Partial<Task>) =>
     updateTask.mutate({ id: live.id, ...fields });
@@ -377,11 +391,17 @@ export function TaskDetail({
           <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-faint">
             Subtasks
           </h3>
-          <div className="flex flex-col">
-            {subtasks.map((st) => (
-              <TaskRow key={st.id} task={st} onOpen={setDrill} />
-            ))}
-          </div>
+          <SortableList
+            items={subtasks}
+            onMove={(from, to) => {
+              const patches = reorderPatches(subtasks, from, to);
+              if (patches.length > 0 && currentSpace) {
+                reorderTasks.mutate({ spaceId: currentSpace.id, patches });
+              }
+            }}
+          >
+            {(st) => <TaskRow key={st.id} task={st} onOpen={setDrill} />}
+          </SortableList>
           <div className="mt-1 flex items-center gap-2">
             <Plus size={14} className="text-ink-faint" />
             <input

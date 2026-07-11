@@ -181,7 +181,7 @@ struct TaskEditView: View {
     /// task detail dialog. Any task can hold them (a task with subtasks IS a
     /// project), so the section also carries the GTD outcome line.
     private var subtasksSection: some View {
-        Section("Subtasks") {
+        Section {
             if !subtasks.isEmpty || !outcome.isEmpty {
                 TextField("Outcome — what does done look like?", text: $outcome)
             }
@@ -199,12 +199,42 @@ struct TaskEditView: View {
                         .foregroundStyle(subtask.status == .done ? .secondary : .primary)
                 }
             }
+            // The order decides which subtask surfaces as the parent's next
+            // action, so reordering here is meaningful, not cosmetic.
+            .onMove(perform: moveSubtasks)
             HStack {
                 Image(systemName: "plus.circle").foregroundStyle(.secondary)
                 TextField("Add a subtask…", text: $newSubtask)
                     .textFieldStyle(.plain)
                     .onSubmit { Task { await addSubtask() } }
             }
+        } header: {
+            HStack {
+                Text("Subtasks")
+                #if os(iOS)
+                if subtasks.count > 1 {
+                    Spacer()
+                    EditButton().font(.footnote)
+                }
+                #endif
+            }
+        }
+    }
+
+    private func moveSubtasks(from source: IndexSet, to destination: Int) {
+        guard let first = source.first else { return }
+        let target = destination > first ? destination - 1 : destination
+        let patches = reorderPatches(subtasks, from: first, to: target)
+        guard !patches.isEmpty else { return }
+        subtasks.move(fromOffsets: source, toOffset: destination)
+        Task {
+            do {
+                let ctx = try session.requireContext()
+                try await TaskRepository(ctx).reorder(patches)
+            } catch {
+                self.error = error.localizedDescription
+            }
+            await loadSubtasks()
         }
     }
 
@@ -225,9 +255,11 @@ struct TaskEditView: View {
         newSubtask = ""
         do {
             let ctx = try session.requireContext()
+            // Append below the existing subtasks (matches the web dialog).
             _ = try await TaskRepository(ctx).create(NewTaskPayload(
                 spaceId: ctx.spaceId, createdBy: ctx.userId, title: text,
-                status: .next, parentTaskId: task.id))
+                status: .next, parentTaskId: task.id,
+                sortOrder: Double(subtasks.count)))
             await loadSubtasks()
         } catch {
             self.error = error.localizedDescription

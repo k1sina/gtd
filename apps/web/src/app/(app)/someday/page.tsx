@@ -1,5 +1,6 @@
 "use client";
 
+import { byUserOrder } from "@gtd/shared";
 import { Moon } from "lucide-react";
 import { useMemo } from "react";
 import { PageHeader, TaskList } from "@/components/task-list";
@@ -15,10 +16,7 @@ export default function SomedayPage() {
     () =>
       tasks
         .filter((t) => t.status === "someday" && !t.parent_task_id)
-        .sort(
-          (a, b) =>
-            new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-        ),
+        .sort(byUserOrder()),
     [tasks]
   );
 
@@ -30,6 +28,7 @@ export default function SomedayPage() {
       />
       <TaskList
         tasks={someday}
+        reorderable
         emptyState={
           <EmptyState
             icon={<Moon size={22} />}

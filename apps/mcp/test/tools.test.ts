@@ -51,6 +51,10 @@ describe("buildUpdatePatch", () => {
     });
     expect(buildUpdatePatch({})).toEqual({});
   });
+
+  it("passes sort_order through for manual reordering", () => {
+    expect(buildUpdatePatch({ sort_order: 2.5 })).toEqual({ sort_order: 2.5 });
+  });
 });
 
 describe("filterAndRankTasks", () => {
@@ -73,6 +77,17 @@ describe("filterAndRankTasks", () => {
     ];
     const out = filterAndRankTasks(rows, { parent_task_id: "p" }, now);
     expect(out.map((t) => t.id)).toEqual(["a"]);
+  });
+
+  it("orders subtask listings by sort_order (the surfacing order), not priority", () => {
+    const rows = [
+      row({ id: "p" }),
+      row({ id: "second", parent_task_id: "p", sort_order: 2, urgency: 4, importance: 4 }),
+      row({ id: "first", parent_task_id: "p", sort_order: 1 }),
+    ];
+    const out = filterAndRankTasks(rows, { parent_task_id: "p" }, now);
+    expect(out.map((t) => t.id)).toEqual(["first", "second"]);
+    expect(out.map((t) => t.sort_order)).toEqual([1, 2]);
   });
 
   it("flags has_subtasks and stalled parents", () => {

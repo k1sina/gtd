@@ -51,5 +51,10 @@ SwiftUI apps for iPhone/Mac/Watch with Siri App Intents, and an MCP server.
   `nextOccurrenceInsert` (`packages/shared/src/completion.ts`) for all TS
   clients (web UI, web assistant, MCP) and from Swift
   `TaskRepository.nextOccurrencePayload`; keep those two in sync.
+- Manual list order: `tasks.sort_order` (double, default 0) sorts ascending
+  BEFORE priority in Next/Someday/subtask lists; drag-and-drop persists it
+  via the `reorder_tasks` RPC (midpoint write, renumber fallback). Helpers in
+  `packages/shared/src/ordering.ts` ↔ `ClarityCore/Ordering.swift` — keep in
+  sync.
 - New tables in `public` are NOT auto-exposed to API roles — migrations must
   GRANT to `authenticated` and add RLS policies.

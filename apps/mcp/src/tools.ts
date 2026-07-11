@@ -60,12 +60,20 @@ export function filterAndRankTasks(rows: TaskRow[], input: ToolInput, now: Date)
     const cutoff = new Date(now.getTime() + Number(input.due_within_days) * 86400000);
     tasks = tasks.filter((t) => t.due_at && new Date(t.due_at) <= cutoff);
   }
-  return tasks
-    .sort(
-      (a, b) =>
-        priorityScore({ ...b, due_at: b.due_at ?? undefined }, now) -
-        priorityScore({ ...a, due_at: a.due_at ?? undefined }, now)
-    )
+  // Subtask listings follow the surfacing order (sort_order, created_at);
+  // top-level listings stay ranked by leverage.
+  const sorted = input.parent_task_id
+    ? tasks.sort(
+        (a, b) =>
+          a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)
+      )
+    : tasks.sort(
+        (a, b) =>
+          priorityScore({ ...b, due_at: b.due_at ?? undefined }, now) -
+          priorityScore({ ...a, due_at: a.due_at ?? undefined }, now)
+      );
+
+  return sorted
     .map((t) => ({
       id: t.id,
       title: t.title,
@@ -82,6 +90,7 @@ export function filterAndRankTasks(rows: TaskRow[], input: ToolInput, now: Date)
       outcome: t.outcome,
       has_subtasks: (openChildCounts.get(t.id) ?? 0) > 0,
       stalled: isStalledParent(t, nodes, now),
+      sort_order: t.sort_order,
       notes: t.notes?.slice(0, 200) ?? null,
     }));
 }
@@ -98,6 +107,7 @@ export function buildUpdatePatch(input: ToolInput): Record<string, unknown> {
     "importance",
     "estimated_minutes",
     "waiting_on",
+    "sort_order",
   ]) {
     if (input[key] !== undefined) patch[key] = input[key];
   }

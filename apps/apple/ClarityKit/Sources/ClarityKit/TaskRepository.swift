@@ -62,11 +62,13 @@ public struct TaskRepository: Sendable {
             .value
     }
 
+    /// Same order as the subtask surfacing walk (sort_order, then created_at).
     public func subtasks(of parentId: UUID) async throws -> [TaskItem] {
         try await ctx.client
             .from("tasks")
             .select()
             .eq("parent_task_id", value: parentId.uuidString)
+            .order("sort_order")
             .order("created_at")
             .execute()
             .value
@@ -191,6 +193,23 @@ public struct TaskRepository: Sendable {
             .single()
             .execute()
             .value
+    }
+
+    /// Persist drag-and-drop ordering via the reorder_tasks RPC — one round
+    /// trip even when a never-ordered list gets renumbered. Mirrors the
+    /// web's useReorderTasks.
+    public func reorder(_ patches: [OrderPatch]) async throws {
+        guard !patches.isEmpty else { return }
+        struct Params: Encodable {
+            let pIds: [UUID]
+            let pOrders: [Double]
+        }
+        try await ctx.client
+            .rpc(
+                "reorder_tasks",
+                params: Params(pIds: patches.map(\.id), pOrders: patches.map(\.sortOrder))
+            )
+            .execute()
     }
 
     public func delete(id: UUID) async throws {
