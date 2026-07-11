@@ -3,12 +3,14 @@ import ClarityKit
 import SwiftUI
 
 /// Due/overdue plus top next actions; tap the circle to complete (recurring
-/// tasks spawn their next occurrence, same as everywhere else).
+/// tasks spawn their next occurrence, same as everywhere else), tap the row
+/// to adjust priority on the matrix.
 struct WatchTodayView: View {
     @Environment(AppSession.self) private var session
     @State private var tasks: [TaskItem] = []
     @State private var loading = true
     @State private var error: String?
+    @State private var editing: TaskItem?
 
     private var agenda: [TaskItem] {
         let endOfDay = Calendar.current.startOfDay(for: .now).addingTimeInterval(86_400)
@@ -35,11 +37,17 @@ struct WatchTodayView: View {
                 }
                 ForEach(agenda) { task in
                     Button {
-                        Task { await complete(task) }
+                        editing = task
                     } label: {
                         HStack(spacing: 6) {
-                            Image(systemName: "circle")
-                                .foregroundStyle(.secondary)
+                            Button {
+                                Task { await complete(task) }
+                            } label: {
+                                Image(systemName: "circle")
+                                    .foregroundStyle(.secondary)
+                                    .frame(width: 28, height: 28)
+                            }
+                            .buttonStyle(.plain)
                             VStack(alignment: .leading, spacing: 1) {
                                 Text(task.title).lineLimit(2)
                                 if let due = task.dueAt {
@@ -55,6 +63,9 @@ struct WatchTodayView: View {
             .navigationTitle("Today")
             .task { await load() }
             .refreshable { await load() }
+            .sheet(item: $editing) { task in
+                WatchPriorityView(task: task) { await load() }
+            }
         }
     }
 

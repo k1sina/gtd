@@ -108,7 +108,8 @@ import Testing
         #expect(Quadrant.doFirst.representativeValues == (4, 4))
         #expect(Quadrant.schedule.representativeValues == (2, 4))
         #expect(Quadrant.delegate.representativeValues == (4, 2))
-        #expect(Quadrant.eliminate.representativeValues == (2, 2))
+        // (1, 1), not (2, 2) — that's the "unrated" sentinel.
+        #expect(Quadrant.eliminate.representativeValues == (1, 1))
         // Round-trip: dropping into a quadrant must land in that quadrant.
         for q: Quadrant in [.doFirst, .schedule, .delegate, .eliminate] {
             let v = q.representativeValues

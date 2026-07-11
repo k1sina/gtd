@@ -100,8 +100,8 @@ struct TaskEditView: View {
                     }
                 }
                 Section("Priority") {
-                    Stepper("Urgency: \(urgency)", value: $urgency, in: 1...4)
-                    Stepper("Importance: \(importance)", value: $importance, in: 1...4)
+                    PriorityMatrixView(urgency: $urgency, importance: $importance)
+                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
                     LabeledContent("Quadrant") {
                         Label(
                             quadrant(urgency: urgency, importance: importance).label,

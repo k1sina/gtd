@@ -20,7 +20,7 @@ import {
   useUpdateTask,
 } from "@/lib/data";
 import { useSpace } from "@/lib/space-context";
-import { PriorityPicker } from "./priority-picker";
+import { PriorityMatrix } from "./priority-matrix";
 import { Button, Input, Select } from "./ui";
 
 /**
@@ -109,7 +109,7 @@ export function ClarifyCard({ task }: { task: Task }) {
       </div>
 
       <div className="mt-4 rounded-lg border border-line bg-canvas/50 p-3">
-        <PriorityPicker
+        <PriorityMatrix
           urgency={task.urgency}
           importance={task.importance}
           onChange={(p) => updateTask.mutate({ id: task.id, ...p })}

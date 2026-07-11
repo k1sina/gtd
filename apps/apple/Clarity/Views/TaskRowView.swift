@@ -2,17 +2,6 @@ import ClarityCore
 import ClarityKit
 import SwiftUI
 
-extension Quadrant {
-    var color: Color {
-        switch self {
-        case .doFirst: return .red
-        case .schedule: return .blue
-        case .delegate: return .orange
-        case .eliminate: return .gray
-        }
-    }
-}
-
 /// One task line: complete button, title + due/recurrence hints, quadrant dot.
 struct TaskRowView: View {
     let task: TaskItem

@@ -21,6 +21,34 @@ export const QUADRANT_LABELS: Record<Quadrant, string> = {
   eliminate: "Eliminate",
 };
 
+/** Steps per axis on the priority grid (values are 1..PRIORITY_STEPS). */
+export const PRIORITY_STEPS = 4;
+
+/**
+ * Map a point on the unit square (y measured DOWN, screen-style) to snapped
+ * grid values. Out-of-range fractions clamp, so drags past the edge stick to
+ * the border cells. x = urgency, y = importance (importance grows upward).
+ */
+export function gridValueFromFraction(
+  fx: number,
+  fy: number
+): { urgency: number; importance: number } {
+  const cell = (f: number) =>
+    Math.min(PRIORITY_STEPS, Math.max(1, Math.floor(f * PRIORITY_STEPS) + 1));
+  return { urgency: cell(fx), importance: cell(1 - fy) };
+}
+
+/** Unit-square center (y down) of a grid cell, for placing the dot. */
+export function fractionFromGridValue(
+  urgency: number,
+  importance: number
+): { fx: number; fy: number } {
+  return {
+    fx: (urgency - 0.5) / PRIORITY_STEPS,
+    fy: 1 - (importance - 0.5) / PRIORITY_STEPS,
+  };
+}
+
 export interface Prioritizable {
   urgency: number;
   importance: number;
