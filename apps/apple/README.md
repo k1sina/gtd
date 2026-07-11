@@ -27,8 +27,9 @@ generated from `project.yml` — never edit `Clarity.xcodeproj` by hand.
 - `Clarity/` — iOS + macOS app sources (one source set, two targets), at
   feature parity with the web app: Today (habit strip, day planner,
   completed today), Inbox + guided clarify flow, Next (context/energy
-  filters), Scheduled, Waiting-for, Someday, Projects (areas, editing,
-  subtasks), priority matrix (drag-and-drop on Mac, move menu on iPhone),
+  filters), Scheduled, Waiting-for, Someday, nested subtasks (a task with
+  subtasks is a project — outcome line, stalled detection, surfaced next
+  action), per-task Eisenhower matrix in the edit sheet,
   Habits, weekly/quarterly Reviews, Goals & values, AI Assistant, full-text
   Search, Settings (sharing, invites, calendar & planning preferences),
   spaces (create/join/switch), sign-up, and the Siri intents

@@ -46,7 +46,7 @@ struct QuickAddField: View {
         if parsed.urgency == 4 { chips.append("urgent") }
         if parsed.importance == 4 { chips.append("important") }
         if parsed.someday { chips.append("someday") }
-        if let hint = parsed.projectHint { chips.append("#\(hint)") }
+        if let hint = parsed.parentHint { chips.append("#\(hint)") }
         chips.append(contentsOf: parsed.tags.map { "@\($0)" })
         return chips
     }

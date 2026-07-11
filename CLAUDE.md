@@ -13,7 +13,7 @@ SwiftUI apps for iPhone/Mac/Watch with Siri App Intents, and an MCP server.
   `Clarity/` (iOS+macOS app sources + App Intents), `ClarityWatch/`
   (standalone watch app). Xcode project is GENERATED: edit `project.yml`,
   run `xcodegen generate` — never edit `Clarity.xcodeproj`.
-- `apps/mcp` — MCP stdio server mirroring the web assistant's 7 tools
+- `apps/mcp` — MCP stdio server mirroring the web assistant's 5 tools
   (`apps/web/src/lib/assistant-tools.ts`); keep the two in sync. Config via
   `apps/mcp/.env` (gitignored), registered in root `.mcp.json`. A remote MCP
   endpoint (`apps/web/src/app/api/mcp/route.ts`, Streamable HTTP, Basic auth

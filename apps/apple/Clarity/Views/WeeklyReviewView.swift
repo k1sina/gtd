@@ -23,8 +23,9 @@ struct WeeklyReviewView: View {
     @State private var review: Review?
     @State private var notes = ""
     @State private var finished = false
+    /// Every task in the space (subtasks included) — stalled detection walks
+    /// the full tree.
     @State private var tasks: [TaskItem] = []
-    @State private var projects: [Project] = []
     @State private var editing: TaskItem?
     @State private var error: String?
     @State private var busy = false
@@ -32,7 +33,9 @@ struct WeeklyReviewView: View {
     private var checklist: [String: Bool] { review?.checklist ?? [:] }
 
     private var open: [TaskItem] {
-        tasks.filter { $0.status != .done && $0.status != .cancelled }
+        tasks.filter {
+            $0.parentTaskId == nil && $0.status != .done && $0.status != .cancelled
+        }
     }
 
     var body: some View {
@@ -44,16 +47,13 @@ struct WeeklyReviewView: View {
             }
         }
         .navigationTitle("Weekly review")
-        .navigationDestination(for: Project.self) { project in
-            ProjectDetailView(project: project)
-        }
         // Space switches restart the review (load resets step/notes)…
         .task(id: session.dataEpoch) { await load() }
         // …but realtime echoes only refresh the task/project lists — they
         // must never clobber the in-progress step or unsaved notes.
         .task(id: session.reloadKey) { await loadData() }
         .sheet(item: $editing) { task in
-            TaskEditView(task: task, projects: projects) { await loadData() }
+            TaskEditView(task: task) { await loadData() }
         }
     }
 
@@ -140,23 +140,20 @@ struct WeeklyReviewView: View {
                 }
             }
         case "projects":
-            let active = projects.filter { $0.status == .active }
-            let stalled = active.filter { project in
-                !open.contains { $0.projectId == project.id && $0.status == .next }
+            // "Projects" = top-level tasks with open subtasks.
+            let active = open.filter {
+                $0.status != .someday && hasOpenSubtasks($0.id, in: tasks)
             }
+            let stalled = open.filter { isStalledParent($0, in: tasks) }
             Section {
                 if stalled.isEmpty {
-                    Label("All \(active.count) active projects have a next action.", systemImage: "checkmark")
+                    Label("All \(active.count) projects have a next action.", systemImage: "checkmark")
                         .foregroundStyle(.green)
                 } else {
-                    Text("\(stalled.count) of \(active.count) active projects have no next action:")
+                    Text("\(stalled.count) of \(active.count) projects (tasks with subtasks) have no next action — open each and decide the next step:")
                         .font(.footnote)
                         .foregroundStyle(.orange)
-                    ForEach(stalled) { project in
-                        NavigationLink(value: project) {
-                            Text(project.name)
-                        }
-                    }
+                    ForEach(stalled) { task in taskRow(task) }
                 }
             }
         case "waiting":
@@ -230,10 +227,7 @@ struct WeeklyReviewView: View {
     private func loadData() async {
         do {
             let ctx = try session.requireContext()
-            async let tasksLoad = TaskRepository(ctx).tasks()
-            async let projectsLoad = ProjectRepository(ctx).projects()
-            tasks = try await tasksLoad
-            projects = try await projectsLoad
+            tasks = try await TaskRepository(ctx).tasks(topLevelOnly: false)
         } catch {
             self.error = error.localizedDescription
         }

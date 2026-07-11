@@ -41,13 +41,16 @@ server.registerTool(
   "list_tasks",
   {
     description:
-      "List the user's tasks. Call this before answering questions about workload, priorities, overdue items, or what to do next. Returns id, title, status, urgency/importance (1-4), quadrant, due date, project, tags, estimate.",
+      "List the user's tasks. Call this before answering questions about workload, priorities, overdue items, or what to do next. Returns id, title, status, urgency/importance (1-4), quadrant, due date, tags, estimate. A task with has_subtasks is a project; stalled means it has no actionable next-step subtask. Pass parent_task_id to list a task's subtasks.",
     inputSchema: {
       status: z
         .enum(["inbox", "next", "waiting", "scheduled", "someday", "done", "all_open"])
         .optional()
         .describe("Filter by status. 'all_open' = everything not done/cancelled."),
-      project_id: z.string().optional().describe("Only tasks in this project"),
+      parent_task_id: z
+        .string()
+        .optional()
+        .describe("List the subtasks of this task instead of top-level tasks"),
       due_within_days: z
         .number()
         .optional()
@@ -66,7 +69,16 @@ server.registerTool(
       title: z.string(),
       status: z.enum(["inbox", "next", "waiting", "scheduled", "someday"]).optional(),
       notes: z.string().optional(),
-      project_id: z.string().optional(),
+      outcome: z
+        .string()
+        .optional()
+        .describe("For multi-step outcomes: what does 'done' look like?"),
+      parent_task_id: z
+        .string()
+        .optional()
+        .describe(
+          "Make this a subtask of that task — use to build project structures (a task with subtasks is a project)"
+        ),
       due_at: z.string().optional().describe("ISO 8601 datetime"),
       urgency: z.number().optional().describe("1-4"),
       importance: z.number().optional().describe("1-4"),
@@ -86,11 +98,12 @@ server.registerTool(
   "update_task",
   {
     description:
-      "Update fields on an existing task: reprioritise (urgency/importance), reschedule (due_at), change status, move to a project, edit title/notes. Get the task id from list_tasks first.",
+      "Update fields on an existing task: reprioritise (urgency/importance), reschedule (due_at), change status, nest it under a parent task, edit title/notes/outcome. Get the task id from list_tasks first.",
     inputSchema: {
       task_id: z.string(),
       title: z.string().optional(),
       notes: z.string().optional(),
+      outcome: z.string().optional(),
       status: z
         .enum(["inbox", "next", "waiting", "scheduled", "someday", "cancelled"])
         .optional(),
@@ -98,7 +111,10 @@ server.registerTool(
       importance: z.number().optional(),
       due_at: z.string().optional().describe("ISO 8601, or empty string to clear"),
       defer_until: z.string().optional(),
-      project_id: z.string().optional(),
+      parent_task_id: z
+        .string()
+        .optional()
+        .describe("Move under this parent task, or empty string to make top-level"),
       estimated_minutes: z.number().optional(),
       waiting_on: z.string().optional(),
     },
@@ -114,28 +130,6 @@ server.registerTool(
     inputSchema: { task_id: z.string() },
   },
   handler("complete_task")
-);
-
-server.registerTool(
-  "list_projects",
-  {
-    description:
-      "List the user's projects with open/done task counts and whether each active project is missing a next action (stalled). Use for project reviews and weekly-review help.",
-    inputSchema: {},
-  },
-  handler("list_projects")
-);
-
-server.registerTool(
-  "create_project",
-  {
-    description: "Create a new project (any outcome needing more than one action).",
-    inputSchema: {
-      name: z.string(),
-      outcome: z.string().optional().describe("What does 'done' look like?"),
-    },
-  },
-  handler("create_project")
 );
 
 server.registerTool(

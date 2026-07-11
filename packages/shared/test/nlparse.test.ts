@@ -20,7 +20,7 @@ describe("parseQuickAdd", () => {
     expect(p.title).toBe("Call mom");
     expect(p.dueAt).toEqual(new Date("2026-07-08T15:00:00"));
     expect(p.tags).toEqual(["phone"]);
-    expect(p.projectHint).toBe("Family");
+    expect(p.parentHint).toBe("Family");
     expect(p.urgency).toBe(4);
     expect(p.estimatedMinutes).toBe(15);
   });

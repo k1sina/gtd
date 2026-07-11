@@ -56,6 +56,12 @@ public func quadrant(urgency: Int, importance: Int) -> Quadrant {
 /// Steps per axis on the priority grid (values are 1...prioritySteps).
 public let prioritySteps = 4
 
+/// (2, 2) is the create-time default and doubles as the "unrated" sentinel —
+/// a task still sitting there has never been prioritised deliberately.
+public func isRatedPriority(urgency: Int, importance: Int) -> Bool {
+    !(urgency == 2 && importance == 2)
+}
+
 /// Map a point on the unit square (y measured DOWN, screen-style) to snapped
 /// grid values. Out-of-range fractions clamp, so drags past the edge stick to
 /// the border cells. x = urgency, y = importance (importance grows upward).

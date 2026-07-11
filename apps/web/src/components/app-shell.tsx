@@ -6,8 +6,6 @@ import {
   CheckCircle2,
   ChevronDown,
   Compass,
-  FolderKanban,
-  Grid2x2,
   Heart,
   Hourglass,
   Inbox,
@@ -40,8 +38,6 @@ const NAV = [
   { href: "/waiting", label: "Waiting for", icon: Hourglass },
   { href: "/someday", label: "Someday / maybe", icon: Moon },
   null,
-  { href: "/projects", label: "Projects", icon: FolderKanban },
-  { href: "/matrix", label: "Priority matrix", icon: Grid2x2 },
   { href: "/habits", label: "Habits", icon: RefreshCcw },
   null,
   { href: "/review", label: "Reviews", icon: Compass },
@@ -299,7 +295,7 @@ function NewSpaceDialog({
     <Dialog open onClose={onClose} title="New shared space">
       <div className="flex flex-col gap-3 p-4">
         <p className="text-xs text-ink-soft">
-          A shared space is a separate world of projects and tasks you can
+          A shared space is a separate world of tasks you can
           invite others into — e.g. “Family” for planning with your partner.
           Your personal space stays private.
         </p>

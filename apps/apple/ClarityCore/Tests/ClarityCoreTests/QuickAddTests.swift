@@ -24,7 +24,7 @@ import Testing
         #expect(p.title == "Call mom")
         #expect(p.dueAt == date("2026-07-08T15:00:00"))
         #expect(p.tags == ["phone"])
-        #expect(p.projectHint == "Family")
+        #expect(p.parentHint == "Family")
         #expect(p.urgency == 4)
         #expect(p.estimatedMinutes == 15)
     }

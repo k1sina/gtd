@@ -10,17 +10,16 @@ struct ClarifyView: View {
     @Environment(\.dismiss) private var dismiss
 
     @State private var queue: [TaskItem] = []
-    @State private var projects: [Project] = []
     @State private var clarified = 0
     @State private var loading = true
     @State private var error: String?
 
     // Per-card state, reset when the card advances.
-    @State private var projectId: UUID?
     @State private var hasDue = false
     @State private var dueAt = Date()
     @State private var urgency = 2
     @State private var importance = 2
+    @State private var priorityExpanded = false
     @State private var askWaiting = false
     @State private var waitingOn = ""
 
@@ -79,25 +78,28 @@ struct ClarifyView: View {
                 }
             }
             Section {
-                Picker("Project", selection: $projectId) {
-                    Text("No project").tag(UUID?.none)
-                    ForEach(projects.filter { $0.status == .active }) { project in
-                        Text(project.name).tag(UUID?.some(project.id))
-                    }
-                }
                 Toggle("Due date", isOn: $hasDue)
                 if hasDue {
                     DatePicker("Due", selection: $dueAt)
                 }
             }
-            Section("Priority") {
-                Stepper("Urgency: \(urgency)", value: $urgency, in: 1...4)
-                Stepper("Importance: \(importance)", value: $importance, in: 1...4)
-                LabeledContent("Quadrant") {
-                    Label(
-                        quadrant(urgency: urgency, importance: importance).label,
-                        systemImage: "circle.fill")
-                    .foregroundStyle(quadrant(urgency: urgency, importance: importance).color)
+            Section {
+                // Collapsed unless the item was deliberately rated already.
+                DisclosureGroup(isExpanded: $priorityExpanded) {
+                    Stepper("Urgency: \(urgency)", value: $urgency, in: 1...4)
+                    Stepper("Importance: \(importance)", value: $importance, in: 1...4)
+                } label: {
+                    LabeledContent("Priority") {
+                        if isRatedPriority(urgency: urgency, importance: importance) {
+                            Label(
+                                quadrant(urgency: urgency, importance: importance).label,
+                                systemImage: "circle.fill")
+                            .foregroundStyle(
+                                quadrant(urgency: urgency, importance: importance).color)
+                        } else {
+                            Text("Not rated")
+                        }
+                    }
                 }
             }
             if askWaiting {
@@ -158,11 +160,9 @@ struct ClarifyView: View {
     private func load() async {
         do {
             let ctx = try session.requireContext()
-            async let tasksLoad = TaskRepository(ctx).tasks(statuses: [.inbox])
-            async let projectsLoad = ProjectRepository(ctx).projects()
             // Oldest first — same order the web clarify flow walks.
-            queue = try await tasksLoad.sorted { $0.createdAt < $1.createdAt }
-            projects = try await projectsLoad
+            queue = try await TaskRepository(ctx).tasks(statuses: [.inbox])
+                .sorted { $0.createdAt < $1.createdAt }
             resetCardState()
             error = nil
         } catch {
@@ -172,11 +172,11 @@ struct ClarifyView: View {
     }
 
     private func resetCardState() {
-        projectId = current?.projectId
         hasDue = false
         dueAt = Date()
         urgency = current?.urgency ?? 2
         importance = current?.importance ?? 2
+        priorityExpanded = isRatedPriority(urgency: urgency, importance: importance)
         askWaiting = false
         waitingOn = ""
     }
@@ -187,14 +187,13 @@ struct ClarifyView: View {
         resetCardState()
     }
 
-    /// Apply the chosen status plus whatever project/due/priority the user
-    /// set on the card — mirrors the web card's `base` patch.
+    /// Apply the chosen status plus whatever due/priority the user set on
+    /// the card — mirrors the web card's `base` patch.
     private func file(_ task: TaskItem, status: TaskStatus) async {
         var patch = TaskPatch()
         patch.status = status
         patch.urgency = urgency
         patch.importance = importance
-        if let projectId { patch.projectId = projectId } else { patch.clearProjectId = true }
         if hasDue { patch.dueAt = dueAt }
         switch status {
         case .done:
@@ -215,19 +214,20 @@ struct ClarifyView: View {
         }
     }
 
-    /// Turn the capture into a project: the project inherits title + notes,
-    /// and the task becomes its "define first next action" seed — exactly
-    /// like the web card.
+    /// Turn the capture into a project: the item itself becomes the parent
+    /// (a task with subtasks IS a project) and gets a "define first next
+    /// action" seed subtask — exactly like the web card.
     private func makeProject(_ task: TaskItem) async {
         do {
             let ctx = try session.requireContext()
-            let project = try await ProjectRepository(ctx).create(
-                name: task.title, outcome: task.notes)
             var patch = TaskPatch()
-            patch.projectId = project.id
-            patch.title = "Define first next action for “\(task.title)”"
             patch.status = .next
+            if let notes = task.notes, !notes.isEmpty { patch.outcome = notes }
             _ = try await TaskRepository(ctx).update(id: task.id, patch: patch)
+            _ = try await TaskRepository(ctx).create(NewTaskPayload(
+                spaceId: ctx.spaceId, createdBy: ctx.userId,
+                title: "Define first next action for “\(task.title)”",
+                status: .next, parentTaskId: task.id))
             advance()
         } catch {
             self.error = error.localizedDescription

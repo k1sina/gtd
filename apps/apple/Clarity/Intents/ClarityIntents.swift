@@ -8,7 +8,7 @@ import Foundation
 struct AddTaskIntent: AppIntent {
     static let title: LocalizedStringResource = "Add to Clarity Inbox"
     static let description = IntentDescription(
-        "Capture a task. Understands dates, times, @tags, #projects, priority, and recurrence — e.g. 'Call mom tomorrow at 3pm @phone !urgent'.")
+        "Capture a task. Understands dates, times, @tags, #parent tasks, priority, and recurrence — e.g. 'Call mom tomorrow at 3pm @phone !urgent'.")
     static let openAppWhenRun = false
 
     @Parameter(title: "Task", requestValueDialog: "What should I capture?")
@@ -17,7 +17,10 @@ struct AddTaskIntent: AppIntent {
     @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         let ctx = try await AppSession.shared.readyContext()
-        let task = try await TaskRepository(ctx).capture(text)
+        // #Parent hints resolve against the space's open top-level tasks.
+        let candidates = try await TaskRepository(ctx).tasks(
+            statuses: [.inbox, .next, .waiting, .scheduled, .someday])
+        let task = try await TaskRepository(ctx).capture(text, parentCandidates: candidates)
         var details = ""
         if let due = task.dueAt {
             details = ", due \(due.formatted(date: .abbreviated, time: .shortened))"

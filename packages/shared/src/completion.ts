@@ -11,7 +11,6 @@ export type CompletableTask = Pick<
   Task,
   | "id"
   | "space_id"
-  | "project_id"
   | "parent_task_id"
   | "assigned_to"
   | "title"
@@ -30,7 +29,6 @@ export type CompletableTask = Pick<
 
 export interface NextOccurrenceInsert {
   space_id: string;
-  project_id: string | null;
   created_by: string;
   assigned_to: string | null;
   title: string;
@@ -65,7 +63,6 @@ export function nextOccurrenceInsert(
   if (!next) return null;
   return {
     space_id: task.space_id,
-    project_id: task.project_id,
     created_by: createdBy,
     assigned_to: task.assigned_to,
     title: task.title,

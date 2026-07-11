@@ -4,6 +4,7 @@ import {
   fractionFromGridValue,
   gridValueFromFraction,
   isDeferred,
+  isRatedPriority,
   priorityScore,
   quadrant,
 } from "../src/priority";
@@ -89,6 +90,15 @@ describe("priorityScore", () => {
     const sorted = [...tasks].sort(byPriority(now));
     expect(sorted[0]).toEqual({ urgency: 4, importance: 4 });
     expect(sorted[2]).toEqual({ urgency: 1, importance: 1 });
+  });
+});
+
+describe("isRatedPriority", () => {
+  it("treats only the (2,2) default as unrated", () => {
+    expect(isRatedPriority(2, 2)).toBe(false);
+    expect(isRatedPriority(1, 1)).toBe(true);
+    expect(isRatedPriority(2, 3)).toBe(true);
+    expect(isRatedPriority(4, 2)).toBe(true);
   });
 });
 

@@ -49,7 +49,7 @@ struct NewSpaceSheet: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("New shared space").font(.headline)
-            Text("A space you can invite others into — tasks and projects in it are visible to every member.")
+            Text("A space you can invite others into — tasks in it are visible to every member.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
             TextField("Space name", text: $name)

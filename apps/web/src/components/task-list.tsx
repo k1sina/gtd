@@ -1,34 +1,28 @@
 "use client";
 
 import type { Task } from "@gtd/shared";
+import { firstActionableSubtask, isStalledParent } from "@gtd/shared";
 import { useMemo, useState } from "react";
-import { useProjects, useTasks } from "@/lib/data";
+import { useTasks } from "@/lib/data";
 import { useSpace } from "@/lib/space-context";
 import { TaskDetail } from "./task-detail";
 import { TaskRow } from "./task-row";
 
 /**
- * Renders top-level tasks with selection + detail editing. Subtask counts are
- * derived from the full task cache.
+ * Renders top-level tasks with selection + detail editing. Subtask counts,
+ * the surfaced next-action subtask, and the stalled flag are derived from
+ * the full task cache.
  */
 export function TaskList({
   tasks,
-  showProject = true,
   emptyState,
 }: {
   tasks: Task[];
-  showProject?: boolean;
   emptyState?: React.ReactNode;
 }) {
   const { currentSpace } = useSpace();
   const { data: allTasks = [] } = useTasks(currentSpace?.id);
-  const { data: projects = [] } = useProjects(currentSpace?.id);
   const [selected, setSelected] = useState<Task | null>(null);
-
-  const projectById = useMemo(
-    () => new Map(projects.map((p) => [p.id, p])),
-    [projects]
-  );
 
   const subtaskStats = useMemo(() => {
     const stats = new Map<string, { done: number; total: number }>();
@@ -42,6 +36,25 @@ export function TaskList({
     return stats;
   }, [allTasks]);
 
+  // A parent task surfaces its first actionable subtask as the visible action
+  // line; a live parent with open subtasks but no next action is stalled.
+  const now = new Date();
+  const surfacing = useMemo(() => {
+    const map = new Map<string, { actionSubtask: Task | null; stalled: boolean }>();
+    for (const t of tasks) {
+      if (!subtaskStats.has(t.id)) continue;
+      map.set(t.id, {
+        actionSubtask:
+          t.status === "done" || t.status === "cancelled"
+            ? null
+            : firstActionableSubtask(t.id, allTasks, now),
+        stalled: isStalledParent(t, allTasks, now),
+      });
+    }
+    return map;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tasks, allTasks, subtaskStats]);
+
   if (tasks.length === 0 && emptyState) return <>{emptyState}</>;
 
   return (
@@ -51,9 +64,9 @@ export function TaskList({
           <TaskRow
             key={task.id}
             task={task}
-            project={task.project_id ? projectById.get(task.project_id) : null}
             subtaskStats={subtaskStats.get(task.id)}
-            showProject={showProject}
+            actionSubtask={surfacing.get(task.id)?.actionSubtask ?? null}
+            stalled={surfacing.get(task.id)?.stalled ?? false}
             onOpen={setSelected}
           />
         ))}

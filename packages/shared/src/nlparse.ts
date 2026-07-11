@@ -7,7 +7,8 @@
 //              next week | next month | in N days/weeks/months
 //   times      at 3pm | at 15:30 | 9:00am
 //   tags       @phone @home
-//   project    #Family  (hint, resolved against project list by the caller)
+//   parent     #Family  (hint, resolved against open top-level task titles
+//              by the caller; the new task files as a subtask)
 //   priority   !urgent (urgency 4) | !important (importance 4) |
 //              !someday (status someday)
 //   estimate   ~30m | ~2h | ~1h30m
@@ -20,7 +21,7 @@ export interface ParsedQuickAdd {
   title: string;
   dueAt: Date | null;
   tags: string[];
-  projectHint: string | null;
+  parentHint: string | null;
   urgency: number | null;
   importance: number | null;
   someday: boolean;
@@ -68,7 +69,7 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
     title: "",
     dueAt: null,
     tags: [],
-    projectHint: null,
+    parentHint: null,
     urgency: null,
     importance: null,
     someday: false,
@@ -84,14 +85,14 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
     }
   };
 
-  // --- tags & project ------------------------------------------------------
+  // --- tags & parent ---------------------------------------------------------
   for (const m of text.matchAll(/(?<=\s)@([\w-]+)/g)) {
     out.tags.push(m[1]!.toLowerCase());
   }
   text = text.replace(/(?<=\s)@[\w-]+/g, " ");
 
   eat(/(?<=\s)#([\w][\w-]*)/, (m) => {
-    out.projectHint = m[1]!;
+    out.parentHint = m[1]!;
   });
 
   // --- priority ------------------------------------------------------------

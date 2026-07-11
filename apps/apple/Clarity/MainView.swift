@@ -3,7 +3,7 @@ import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
     case today, assistant, inbox, next, scheduled, waiting, someday
-    case projects, matrix, habits
+    case habits
     case reviews, goals
     case search, settings
 
@@ -18,8 +18,6 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .scheduled: return "Scheduled"
         case .waiting: return "Waiting for"
         case .someday: return "Someday/maybe"
-        case .projects: return "Projects"
-        case .matrix: return "Priority matrix"
         case .habits: return "Habits"
         case .reviews: return "Reviews"
         case .goals: return "Goals & values"
@@ -37,8 +35,6 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .scheduled: return "calendar"
         case .waiting: return "hourglass"
         case .someday: return "moon.zzz"
-        case .projects: return "folder"
-        case .matrix: return "square.grid.2x2"
         case .habits: return "flame"
         case .reviews: return "checklist"
         case .goals: return "scope"
@@ -50,14 +46,14 @@ enum AppSection: String, CaseIterable, Identifiable {
     /// Sidebar groups mirroring the web app's navigation.
     static let groups: [(title: String?, sections: [AppSection])] = [
         (nil, [.today, .assistant, .inbox, .next, .scheduled, .waiting, .someday]),
-        ("Organize", [.projects, .matrix, .habits]),
+        ("Organize", [.habits]),
         ("Horizons", [.reviews, .goals]),
         ("System", [.search, .settings]),
     ]
 
     /// iOS: sections that live in the Browse tab rather than the tab bar.
     static let browse: [AppSection] = [
-        .scheduled, .waiting, .someday, .projects, .matrix, .habits,
+        .scheduled, .waiting, .someday, .habits,
         .reviews, .goals, .assistant, .search,
     ]
 }
@@ -100,7 +96,7 @@ struct MainView: View {
             tab(.next)
             NavigationStack { BrowseView() }
                 .tabItem { Label("Browse", systemImage: "square.grid.2x2") }
-                .tag(AppSection.projects) // any non-tab section selects Browse
+                .tag(AppSection.search) // any non-tab section selects Browse
             tab(.settings)
         }
         .id(session.dataEpoch)
@@ -138,8 +134,6 @@ func sectionView(_ section: AppSection) -> some View {
     case .scheduled: ScheduledView()
     case .waiting: WaitingView()
     case .someday: SomedayView()
-    case .projects: ProjectsView()
-    case .matrix: MatrixView()
     case .habits: HabitsView()
     case .reviews: ReviewsHubView()
     case .goals: GoalsView()

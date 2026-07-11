@@ -9,13 +9,6 @@ export type TaskStatus =
   | "done"
   | "cancelled";
 
-export type ProjectStatus =
-  | "active"
-  | "someday"
-  | "on_hold"
-  | "completed"
-  | "archived";
-
 export type Energy = "low" | "medium" | "high";
 
 export type SpaceRole = "owner" | "member";
@@ -46,38 +39,15 @@ export interface SpaceMember {
   created_at: string;
 }
 
-export interface Area {
-  id: string;
-  space_id: string;
-  name: string;
-  color: string | null;
-  sort_order: number;
-  created_at: string;
-}
-
-export interface Project {
-  id: string;
-  space_id: string;
-  area_id: string | null;
-  goal_id: string | null;
-  name: string;
-  outcome: string | null; // GTD: what does "done" look like?
-  status: ProjectStatus;
-  sort_order: number;
-  reviewed_at: string | null;
-  created_at: string;
-  completed_at: string | null;
-}
-
 export interface Task {
   id: string;
   space_id: string;
-  project_id: string | null;
   parent_task_id: string | null;
   created_by: string;
   assigned_to: string | null;
   title: string;
   notes: string | null;
+  outcome: string | null; // GTD: what does "done" look like? (parents of subtasks)
   status: TaskStatus;
   urgency: number; // 1..4
   importance: number; // 1..4

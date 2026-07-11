@@ -6,7 +6,6 @@ import SwiftUI
 struct InboxView: View {
     @Environment(AppSession.self) private var session
     @State private var tasks: [TaskItem] = []
-    @State private var projects: [Project] = []
     @State private var captureText = ""
     @State private var editing: TaskItem?
     @State private var clarifying = false
@@ -71,7 +70,7 @@ struct InboxView: View {
             ClarifyView()
         }
         .sheet(item: $editing) { task in
-            TaskEditView(task: task, projects: projects) { await load() }
+            TaskEditView(task: task) { await load() }
         }
     }
 
@@ -80,7 +79,6 @@ struct InboxView: View {
             let ctx = try session.requireContext()
             tasks = try await TaskRepository(ctx).tasks(statuses: [.inbox])
                 .sorted { $0.createdAt > $1.createdAt }
-            projects = try await ProjectRepository(ctx).projects()
             error = nil
         } catch {
             self.error = error.localizedDescription
@@ -94,7 +92,10 @@ struct InboxView: View {
         captureText = ""
         do {
             let ctx = try session.requireContext()
-            _ = try await TaskRepository(ctx).capture(text, projects: projects)
+            // #Parent hints resolve against the space's open top-level tasks.
+            let candidates = try await TaskRepository(ctx).tasks(
+                statuses: [.inbox, .next, .waiting, .scheduled, .someday])
+            _ = try await TaskRepository(ctx).capture(text, parentCandidates: candidates)
             await load()
         } catch {
             self.error = error.localizedDescription

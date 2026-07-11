@@ -4,7 +4,6 @@ import { nextOccurrenceInsert, type CompletableTask } from "../src/completion";
 const base: CompletableTask = {
   id: "task-1",
   space_id: "space-1",
-  project_id: "project-1",
   parent_task_id: null,
   assigned_to: "user-2",
   title: "Water the plants",
@@ -28,7 +27,6 @@ describe("nextOccurrenceInsert", () => {
     const insert = nextOccurrenceInsert(base, "user-1", now);
     expect(insert).toMatchObject({
       space_id: "space-1",
-      project_id: "project-1",
       created_by: "user-1",
       assigned_to: "user-2",
       title: "Water the plants",

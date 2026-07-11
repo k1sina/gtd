@@ -32,31 +32,31 @@ final class RemindersImportTests: XCTestCase {
         XCTAssertEqual(RemindersImport.status(forList: " someday "), .someday)
     }
 
-    func testStatusForProjectListsIsNext() {
+    func testStatusForOtherListsIsNext() {
         XCTAssertEqual(RemindersImport.status(forList: "Budget"), .next)
         XCTAssertEqual(RemindersImport.status(forList: "Active Projects"), .next)
     }
 
-    // MARK: project mapping
+    // MARK: parent mapping
 
-    func testSectionsBecomeProjects() {
+    func testSectionsBecomeParents() {
         XCTAssertEqual(
-            RemindersImport.projectName(listName: "Active Projects", sectionName: "JAKOTA"),
+            RemindersImport.parentTitle(listName: "Active Projects", sectionName: "JAKOTA"),
             "JAKOTA")
         XCTAssertEqual(
-            RemindersImport.projectName(listName: "Someday", sectionName: "Travel"),
+            RemindersImport.parentTitle(listName: "Someday", sectionName: "Travel"),
             "Travel")
     }
 
-    func testStatusListsWithoutSectionHaveNoProject() {
-        XCTAssertNil(RemindersImport.projectName(listName: "Inbox", sectionName: nil))
-        XCTAssertNil(RemindersImport.projectName(listName: "Someday", sectionName: nil))
-        XCTAssertNil(RemindersImport.projectName(listName: "Waiting", sectionName: ""))
+    func testStatusListsWithoutSectionHaveNoParent() {
+        XCTAssertNil(RemindersImport.parentTitle(listName: "Inbox", sectionName: nil))
+        XCTAssertNil(RemindersImport.parentTitle(listName: "Someday", sectionName: nil))
+        XCTAssertNil(RemindersImport.parentTitle(listName: "Waiting", sectionName: ""))
     }
 
-    func testOtherListsBecomeProjects() {
+    func testOtherListsBecomeParents() {
         XCTAssertEqual(
-            RemindersImport.projectName(listName: "Budget", sectionName: nil), "Budget")
+            RemindersImport.parentTitle(listName: "Budget", sectionName: nil), "Budget")
     }
 
     // MARK: priority
@@ -126,14 +126,24 @@ final class RemindersImportTests: XCTestCase {
             for: reminder(
                 id: "ABC", list: "Active Projects", section: "JAKOTA",
                 title: "  Log my times  ", notes: "  ", tags: ["desk", "m"]),
-            spaceId: spaceId, userId: userId, projectIds: ["jakota": jakota])
+            spaceId: spaceId, userId: userId, parentIds: ["jakota": jakota])
         XCTAssertEqual(payload.title, "Log my times")
         XCTAssertNil(payload.notes)
         XCTAssertEqual(payload.status, .next)
-        XCTAssertEqual(payload.projectId, jakota)
+        XCTAssertEqual(payload.parentTaskId, jakota)
         XCTAssertEqual(payload.contextTags, ["desk", "m"])
         XCTAssertEqual(payload.externalRef, "apple-reminders:ABC")
         XCTAssertNil(payload.completedAt)
+    }
+
+    func testReminderLevelParentWinsOverListParent() {
+        let listParent = UUID()
+        let reminderParent = UUID()
+        let payload = RemindersImport.payload(
+            for: reminder(id: "child", list: "Budget", parent: "parent-ref"),
+            spaceId: spaceId, userId: userId, parentIds: ["budget": listParent],
+            parentTaskId: reminderParent)
+        XCTAssertEqual(payload.parentTaskId, reminderParent)
     }
 
     func testPayloadForCompletedReminderOverridesStatus() {
@@ -142,7 +152,7 @@ final class RemindersImportTests: XCTestCase {
             for: reminder(
                 list: "Soon", completed: true, completionDate: done,
                 recurrence: ImportedRecurrence(frequency: .daily)),
-            spaceId: spaceId, userId: userId, projectIds: [:])
+            spaceId: spaceId, userId: userId, parentIds: [:])
         XCTAssertEqual(payload.status, .done)
         XCTAssertEqual(payload.completedAt, done)
         // Completed reminders must not respawn via the recurrence engine.
@@ -152,17 +162,19 @@ final class RemindersImportTests: XCTestCase {
     func testPayloadEmptyTitleFallsBack() {
         let payload = RemindersImport.payload(
             for: reminder(list: "Inbox", title: "   "),
-            spaceId: spaceId, userId: userId, projectIds: [:])
+            spaceId: spaceId, userId: userId, parentIds: [:])
         XCTAssertEqual(payload.title, "Untitled")
     }
 
-    // MARK: project discovery
+    // MARK: parent discovery
 
-    func testMissingProjectNamesDedupesCaseInsensitively() {
+    func testMissingParentTitlesDedupesCaseInsensitively() {
         let existing = [
-            Project(id: UUID(), spaceId: spaceId, name: "jakota")
+            TaskItem(
+                id: UUID(), spaceId: spaceId, createdBy: userId, title: "jakota",
+                status: .next)
         ]
-        let missing = RemindersImport.missingProjectNames(
+        let missing = RemindersImport.missingParentTitles(
             for: [
                 reminder(id: "1", list: "Active Projects", section: "JAKOTA"),
                 reminder(id: "2", list: "Budget"),
@@ -181,10 +193,10 @@ final class RemindersImportTests: XCTestCase {
             for: reminder(
                 list: "Soon", notes: "n", due: Date(), tags: ["desk"],
                 recurrence: ImportedRecurrence(frequency: .daily)),
-            spaceId: spaceId, userId: userId, projectIds: [:])
+            spaceId: spaceId, userId: userId, parentIds: [:])
         let sparse = RemindersImport.payload(
             for: reminder(list: "Inbox"),
-            spaceId: spaceId, userId: userId, projectIds: [:])
+            spaceId: spaceId, userId: userId, parentIds: [:])
 
         func keys(_ p: NewTaskPayload) throws -> Set<String> {
             let data = try PostgrestJSON.encoder.encode(p)
