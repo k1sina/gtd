@@ -6,8 +6,9 @@ import SwiftUI
 /// their defer date (they live on the Scheduled view) — same as the web.
 struct NextView: View {
     @Environment(AppSession.self) private var session
-    @State private var tasks: [TaskItem] = []
-    @State private var projects: [Project] = []
+    /// Every task in the space (subtasks included) — needed for the surfaced
+    /// next action and stalled detection on parents.
+    @State private var allTasks: [TaskItem] = []
     @State private var subtaskCounts: [UUID: (done: Int, total: Int)] = [:]
     @State private var editing: TaskItem?
     @State private var loading = true
@@ -17,8 +18,8 @@ struct NextView: View {
 
     private var ranked: [TaskItem] {
         let now = Date()
-        return tasks
-            .filter { !isDeferred($0, now: now) }
+        return allTasks
+            .filter { $0.parentTaskId == nil && $0.status == .next && !isDeferred($0, now: now) }
             .sorted { priorityScore($0, now: now) > priorityScore($1, now: now) }
     }
 
@@ -38,7 +39,7 @@ struct NextView: View {
             if let error {
                 Section { Text(error).foregroundStyle(.red).font(.footnote) }
             }
-            if !allTags.isEmpty || tasks.contains(where: { $0.energy != nil }) {
+            if !allTags.isEmpty || ranked.contains(where: { $0.energy != nil }) {
                 Section {
                     filterChips
                 }
@@ -51,8 +52,14 @@ struct NextView: View {
                     Text("Nothing matches the filters.").foregroundStyle(.secondary)
                 }
                 ForEach(filtered) { task in
-                    TaskRowView(task: task, subtaskStats: subtaskCounts[task.id]) {
-                        Task { await complete(task) }
+                    let action = firstActionableSubtask(of: task.id, in: allTasks)
+                    TaskRowView(
+                        task: task,
+                        subtaskStats: subtaskCounts[task.id],
+                        actionSubtask: action,
+                        stalled: isStalledParent(task, in: allTasks)
+                    ) {
+                        Task { await complete(action ?? task) }
                     } onTap: {
                         editing = task
                     }
@@ -72,7 +79,7 @@ struct NextView: View {
         }
         #endif
         .sheet(item: $editing) { task in
-            TaskEditView(task: task, projects: projects) { await load() }
+            TaskEditView(task: task) { await load() }
         }
     }
 
@@ -115,10 +122,9 @@ struct NextView: View {
     private func load() async {
         do {
             let ctx = try session.requireContext()
-            let repo = TaskRepository(ctx)
-            tasks = try await repo.tasks(statuses: [.next])
-            subtaskCounts = try await repo.subtaskCounts(for: tasks.map(\.id))
-            projects = try await ProjectRepository(ctx).projects()
+            allTasks = try await TaskRepository(ctx).tasks(topLevelOnly: false)
+            subtaskCounts = TaskRepository.aggregateSubtaskCounts(
+                allTasks.map { ($0.parentTaskId, $0.status) })
             error = nil
         } catch {
             self.error = error.localizedDescription

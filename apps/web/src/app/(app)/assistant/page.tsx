@@ -23,7 +23,7 @@ const QUICK_PROMPTS = [
   "What should I focus on today?",
   "Prioritise my inbox — suggest urgency and importance for each item",
   "Plan focus blocks for my day",
-  "Which projects are stalled without a next action?",
+  "Which tasks are stalled without a next action?",
   "Help me prepare my weekly review",
 ];
 
@@ -32,8 +32,6 @@ const TOOL_LABELS: Record<string, string> = {
   create_task: "Creating task",
   update_task: "Updating task",
   complete_task: "Completing task",
-  list_projects: "Reading projects",
-  create_project: "Creating project",
   plan_day: "Planning the day",
 };
 

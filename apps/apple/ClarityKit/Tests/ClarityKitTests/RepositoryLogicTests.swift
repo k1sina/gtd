@@ -11,7 +11,7 @@ private func makeTask(
     recurrenceParentId: UUID? = nil
 ) -> TaskItem {
     TaskItem(
-        id: UUID(), spaceId: UUID(), projectId: UUID(), parentTaskId: parentTaskId,
+        id: UUID(), spaceId: UUID(), parentTaskId: parentTaskId,
         createdBy: UUID(), assignedTo: nil, title: "Water plants", notes: "Back porch",
         status: status, urgency: 3, importance: 2, dueAt: dueAt, deferUntil: nil,
         estimatedMinutes: 15, energy: .low, contextTags: ["home"], waitingOn: nil,
@@ -31,7 +31,6 @@ private func makeTask(
         #expect(payload.dueAt == date("2026-07-10T09:00:00"))
         #expect(payload.title == task.title)
         #expect(payload.notes == task.notes)
-        #expect(payload.projectId == task.projectId)
         #expect(payload.estimatedMinutes == 15)
         #expect(payload.energy == .low)
         #expect(payload.contextTags == ["home"])
@@ -78,20 +77,40 @@ private func makeTask(
     @Test func mapsParseOntoPayload() {
         let spaceId = UUID()
         let userId = UUID()
-        let family = Project(
-            id: UUID(), spaceId: spaceId, name: "Family", outcome: nil,
-            status: .active, sortOrder: 0)
+        let family = TaskItem(
+            id: UUID(), spaceId: spaceId, createdBy: userId, title: "Family",
+            status: .next)
         let parsed = parseQuickAdd(
             "Call mom tomorrow at 3pm @phone #Family !urgent ~15m", now: now)
         let payload = NewTaskPayload(
-            parsed: parsed, spaceId: spaceId, createdBy: userId, projects: [family])
+            parsed: parsed, spaceId: spaceId, createdBy: userId,
+            parentCandidates: [family])
         #expect(payload.title == "Call mom")
-        #expect(payload.projectId == family.id)
+        #expect(payload.parentTaskId == family.id)
         #expect(payload.urgency == 4)
         #expect(payload.importance == 2)
         #expect(payload.estimatedMinutes == 15)
         #expect(payload.contextTags == ["phone"])
         #expect(payload.status == .inbox)
+    }
+
+    @Test func parentHintSkipsClosedAndNestedCandidates() {
+        let spaceId = UUID()
+        let userId = UUID()
+        let doneTwin = TaskItem(
+            id: UUID(), spaceId: spaceId, createdBy: userId, title: "Family",
+            status: .done)
+        let nestedTwin = TaskItem(
+            id: UUID(), spaceId: spaceId, parentTaskId: UUID(), createdBy: userId,
+            title: "Family", status: .next)
+        let prefixMatch = TaskItem(
+            id: UUID(), spaceId: spaceId, createdBy: userId, title: "Family trip",
+            status: .next)
+        let parsed = parseQuickAdd("Book hotel #Family", now: now)
+        let payload = NewTaskPayload(
+            parsed: parsed, spaceId: spaceId, createdBy: userId,
+            parentCandidates: [doneTwin, nestedTwin, prefixMatch])
+        #expect(payload.parentTaskId == prefixMatch.id)
     }
 
     @Test func somedayGoesToSomeday() {
@@ -101,29 +120,20 @@ private func makeTask(
     }
 }
 
-@Suite struct ProjectSummaryTests {
-    @Test func stalledMeansActiveWithNoNextAction() {
-        let spaceId = UUID()
-        let active = Project(
-            id: UUID(), spaceId: spaceId, name: "Active", outcome: nil,
-            status: .active, sortOrder: 0)
-        let moving = Project(
-            id: UUID(), spaceId: spaceId, name: "Moving", outcome: nil,
-            status: .active, sortOrder: 1)
+@Suite struct StalledParentTests {
+    @Test func stalledMeansLiveParentWithNoNextAction() {
+        let stalled = makeTask(status: .next)
         var waiting = makeTask(status: .waiting)
-        waiting.projectId = active.id
+        waiting.parentTaskId = stalled.id
+        let moving = makeTask(status: .next)
         var next = makeTask(status: .next)
-        next.projectId = moving.id
+        next.parentTaskId = moving.id
         var done = makeTask(status: .done)
-        done.projectId = moving.id
+        done.parentTaskId = moving.id
 
-        let summaries = ProjectSummary.summarize(
-            projects: [active, moving], tasks: [waiting, next, done])
-        #expect(summaries[0].stalled == true)
-        #expect(summaries[0].openTasks == 1)
-        #expect(summaries[1].stalled == false)
-        #expect(summaries[1].openTasks == 1)
-        #expect(summaries[1].doneTasks == 1)
+        let tasks = [stalled, waiting, moving, next, done]
+        #expect(isStalledParent(stalled, in: tasks) == true)
+        #expect(isStalledParent(moving, in: tasks) == false)
     }
 }
 

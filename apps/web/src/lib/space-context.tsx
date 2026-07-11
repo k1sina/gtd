@@ -74,16 +74,6 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
         {
           event: "*",
           schema: "public",
-          table: "projects",
-          filter: `space_id=eq.${currentSpaceId}`,
-        },
-        () => qc.invalidateQueries({ queryKey: ["projects", currentSpaceId] })
-      )
-      .on(
-        "postgres_changes",
-        {
-          event: "*",
-          schema: "public",
           table: "task_comments",
           filter: `space_id=eq.${currentSpaceId}`,
         },

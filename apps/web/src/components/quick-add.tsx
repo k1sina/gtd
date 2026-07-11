@@ -11,21 +11,15 @@ import {
   Tag,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
-import { useCreateTask, useProjects } from "@/lib/data";
+import { useCreateTask, useTasks } from "@/lib/data";
 import { formatMinutes } from "@/lib/format";
 import { useSpace } from "@/lib/space-context";
 import { Badge, Dialog } from "./ui";
 
 /** Mount only while open (`{open && <QuickAdd …/>}`) so state resets per use. */
-export function QuickAdd({
-  onClose,
-  defaultProjectId,
-}: {
-  onClose: () => void;
-  defaultProjectId?: string;
-}) {
+export function QuickAdd({ onClose }: { onClose: () => void }) {
   const { currentSpace } = useSpace();
-  const { data: projects = [] } = useProjects(currentSpace?.id);
+  const { data: allTasks = [] } = useTasks(currentSpace?.id);
   const createTask = useCreateTask();
   const [text, setText] = useState("");
   const [savedCount, setSavedCount] = useState(0);
@@ -33,15 +27,20 @@ export function QuickAdd({
 
   const parsed = useMemo(() => parseQuickAdd(text), [text]);
 
-  const matchedProject = useMemo(() => {
-    if (!parsed.projectHint) return null;
-    const hint = parsed.projectHint.toLowerCase();
+  // "#Renovation" files the capture as a subtask of that task — matching any
+  // open top-level task is deliberate: that's how a task becomes a project.
+  const matchedParent = useMemo(() => {
+    if (!parsed.parentHint) return null;
+    const hint = parsed.parentHint.toLowerCase();
+    const candidates = allTasks.filter(
+      (t) => !t.parent_task_id && !["done", "cancelled"].includes(t.status)
+    );
     return (
-      projects.find((p) => p.name.toLowerCase() === hint) ??
-      projects.find((p) => p.name.toLowerCase().includes(hint)) ??
+      candidates.find((t) => t.title.toLowerCase() === hint) ??
+      candidates.find((t) => t.title.toLowerCase().includes(hint)) ??
       null
     );
-  }, [parsed.projectHint, projects]);
+  }, [parsed.parentHint, allTasks]);
 
   async function save() {
     if (!currentSpace || !parsed.title.trim()) return;
@@ -49,7 +48,7 @@ export function QuickAdd({
       space_id: currentSpace.id,
       title: parsed.title.trim(),
       status: parsed.someday ? "someday" : "inbox",
-      project_id: matchedProject?.id ?? defaultProjectId ?? null,
+      parent_task_id: matchedParent?.id ?? null,
       due_at: parsed.dueAt?.toISOString() ?? null,
       context_tags: parsed.tags,
       urgency: parsed.urgency ?? undefined,
@@ -107,10 +106,12 @@ export function QuickAdd({
               {t}
             </Badge>
           ))}
-          {parsed.projectHint && (
-            <Badge tone={matchedProject ? "green" : "neutral"}>
+          {parsed.parentHint && (
+            <Badge tone={matchedParent ? "green" : "neutral"}>
               <FolderKanban size={11} />
-              {matchedProject ? matchedProject.name : `${parsed.projectHint}?`}
+              {matchedParent
+                ? `subtask of ${matchedParent.title}`
+                : `${parsed.parentHint}?`}
             </Badge>
           )}
           {(parsed.urgency || parsed.importance) && (
@@ -143,8 +144,8 @@ export function QuickAdd({
             : "Enter to capture · Esc to close"}
         </span>
         <span>
-          Syntax: date · @tag · #project · !urgent !important !someday · ~30m ·
-          every week
+          Syntax: date · @tag · #parent task · !urgent !important !someday ·
+          ~30m · every week
         </span>
       </div>
     </Dialog>

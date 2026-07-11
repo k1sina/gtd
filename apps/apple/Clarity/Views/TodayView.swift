@@ -5,10 +5,10 @@ import SwiftUI
 /// Today: due/overdue tasks plus the top next actions, with quick capture.
 struct TodayView: View {
     @Environment(AppSession.self) private var session
-    @State private var tasks: [TaskItem] = []
+    /// Every task in the space (subtasks included) — the source for lists,
+    /// subtask counts, and the surfaced next action per parent.
+    @State private var allTasks: [TaskItem] = []
     @State private var subtaskCounts: [UUID: (done: Int, total: Int)] = [:]
-    @State private var completedToday: [TaskItem] = []
-    @State private var projects: [Project] = []
     @State private var habits: [Habit] = []
     @State private var habitLogs: [HabitLog] = []
     @State private var captureText = ""
@@ -16,20 +16,36 @@ struct TodayView: View {
     @State private var loading = true
     @State private var error: String?
 
+    private static let openStatuses: Set<TaskStatus> = [.next, .scheduled, .inbox, .waiting]
+
+    private var openTopLevel: [TaskItem] {
+        allTasks.filter { $0.parentTaskId == nil && Self.openStatuses.contains($0.status) }
+    }
+
     private var dueToday: [TaskItem] {
         let endOfDay = Calendar.current.startOfDay(for: .now).addingTimeInterval(86_400)
-        return tasks
+        return openTopLevel
             .filter { $0.dueAt.map { $0 < endOfDay } ?? false }
             .sorted { priorityScore($0) > priorityScore($1) }
     }
 
     private var topPicks: [TaskItem] {
         let dueIds = Set(dueToday.map(\.id))
-        return tasks
+        return openTopLevel
             .filter { $0.status == .next && !dueIds.contains($0.id) && !isDeferred($0) }
             .sorted { priorityScore($0) > priorityScore($1) }
             .prefix(5)
             .map { $0 }
+    }
+
+    private var completedToday: [TaskItem] {
+        let startOfDay = Calendar.current.startOfDay(for: .now)
+        return allTasks
+            .filter {
+                $0.parentTaskId == nil && $0.status == .done
+                    && ($0.completedAt.map { $0 >= startOfDay } ?? false)
+            }
+            .sorted { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }
     }
 
     var body: some View {
@@ -78,13 +94,21 @@ struct TodayView: View {
         }
         #endif
         .sheet(item: $editing) { task in
-            TaskEditView(task: task, projects: projects) { await load() }
+            TaskEditView(task: task) { await load() }
         }
     }
 
     private func row(_ task: TaskItem) -> some View {
-        TaskRowView(task: task, subtaskStats: subtaskCounts[task.id]) {
-            Task { await complete(task) }
+        // A parent surfaces its first actionable subtask as the visible line;
+        // completing acts on the subtask. Tapping still opens the parent.
+        let action = firstActionableSubtask(of: task.id, in: allTasks)
+        return TaskRowView(
+            task: task,
+            subtaskStats: subtaskCounts[task.id],
+            actionSubtask: action,
+            stalled: isStalledParent(task, in: allTasks)
+        ) {
+            Task { await complete(action ?? task) }
         } onTap: {
             editing = task
         }
@@ -94,20 +118,14 @@ struct TodayView: View {
         do {
             let ctx = try session.requireContext()
             let repo = TaskRepository(ctx)
-            async let tasksLoad = repo.tasks(statuses: [.next, .scheduled, .inbox, .waiting])
-            async let doneLoad = repo.tasks(
-                statuses: [.done],
-                completedAfter: Calendar.current.startOfDay(for: .now))
-            async let projectsLoad = ProjectRepository(ctx).projects()
+            async let tasksLoad = repo.tasks(topLevelOnly: false)
             let habitRepo = HabitRepository(ctx)
             async let habitsLoad = habitRepo.habits()
             async let logsLoad = habitRepo.logs(
                 since: Dates.dateKey(Dates.addDays(Date(), -366)))
-            tasks = try await tasksLoad
-            subtaskCounts = try await repo.subtaskCounts(for: tasks.map(\.id))
-            completedToday = try await doneLoad
-                .sorted { ($0.completedAt ?? .distantPast) > ($1.completedAt ?? .distantPast) }
-            projects = try await projectsLoad
+            allTasks = try await tasksLoad
+            subtaskCounts = TaskRepository.aggregateSubtaskCounts(
+                allTasks.map { ($0.parentTaskId, $0.status) })
             habits = try await habitsLoad
             habitLogs = try await logsLoad
             error = nil
@@ -133,7 +151,7 @@ struct TodayView: View {
         captureText = ""
         do {
             let ctx = try session.requireContext()
-            _ = try await TaskRepository(ctx).capture(text, projects: projects)
+            _ = try await TaskRepository(ctx).capture(text, parentCandidates: openTopLevel)
             await load()
         } catch {
             self.error = error.localizedDescription

@@ -89,8 +89,9 @@ public struct TaskRepository: Sendable {
         return Self.aggregateSubtaskCounts(rows.map { ($0.parentTaskId, $0.status) })
     }
 
-    /// Pure aggregation helper (unit-tested).
-    static func aggregateSubtaskCounts(
+    /// Pure aggregation helper (unit-tested). Public so views that already
+    /// hold the full task list can derive counts without a second query.
+    public static func aggregateSubtaskCounts(
         _ rows: [(parentTaskId: UUID?, status: TaskStatus)]
     ) -> [UUID: (done: Int, total: Int)] {
         var counts: [UUID: (done: Int, total: Int)] = [:]
@@ -167,15 +168,17 @@ public struct TaskRepository: Sendable {
     }
 
     /// Quick capture: run the text through the natural-language parser and
-    /// insert the result.
+    /// insert the result. `parentCandidates` are the tasks a `#Parent` hint
+    /// may resolve against (open, top-level).
     public func capture(
         _ text: String,
-        projects: [Project] = [],
+        parentCandidates: [TaskItem] = [],
         now: Date = Date()
     ) async throws -> TaskItem {
         let parsed = parseQuickAdd(text, now: now)
         let payload = NewTaskPayload(
-            parsed: parsed, spaceId: ctx.spaceId, createdBy: ctx.userId, projects: projects)
+            parsed: parsed, spaceId: ctx.spaceId, createdBy: ctx.userId,
+            parentCandidates: parentCandidates)
         return try await create(payload)
     }
 
@@ -239,7 +242,6 @@ public struct TaskRepository: Sendable {
             title: task.title,
             notes: task.notes,
             status: task.status == .inbox ? .inbox : .next,
-            projectId: task.projectId,
             assignedTo: task.assignedTo,
             urgency: task.urgency,
             importance: task.importance,

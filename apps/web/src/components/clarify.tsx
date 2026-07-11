@@ -1,6 +1,7 @@
 "use client";
 
 import type { Task } from "@gtd/shared";
+import { isRatedPriority } from "@gtd/shared";
 import {
   AlarmClockOff,
   CalendarDays,
@@ -13,15 +14,10 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import {
-  useCreateProject,
-  useDeleteTask,
-  useProjects,
-  useUpdateTask,
-} from "@/lib/data";
+import { useCreateTask, useDeleteTask, useUpdateTask } from "@/lib/data";
 import { useSpace } from "@/lib/space-context";
 import { PriorityMatrix } from "./priority-matrix";
-import { Button, Input, Select } from "./ui";
+import { Button, Input } from "./ui";
 
 /**
  * GTD clarify flow: walk through inbox items one at a time and decide what
@@ -30,12 +26,10 @@ import { Button, Input, Select } from "./ui";
  */
 export function ClarifyCard({ task }: { task: Task }) {
   const { currentSpace } = useSpace();
-  const { data: projects = [] } = useProjects(currentSpace?.id);
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
-  const createProject = useCreateProject();
+  const createTask = useCreateTask();
 
-  const [projectId, setProjectId] = useState(task.project_id ?? "");
   const [due, setDue] = useState("");
   const [waitingOn, setWaitingOn] = useState("");
   const [askWaiting, setAskWaiting] = useState(false);
@@ -43,7 +37,6 @@ export function ClarifyCard({ task }: { task: Task }) {
 
   const base = {
     id: task.id,
-    project_id: projectId || null,
     due_at: due ? new Date(due).toISOString() : task.due_at,
   };
 
@@ -86,19 +79,6 @@ export function ClarifyCard({ task }: { task: Task }) {
 
       <div className="mt-4 grid grid-cols-2 gap-4">
         <label className="flex flex-col gap-1 text-xs text-ink-soft">
-          Project
-          <Select value={projectId} onChange={(e) => setProjectId(e.target.value)}>
-            <option value="">No project</option>
-            {projects
-              .filter((p) => p.status === "active")
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-          </Select>
-        </label>
-        <label className="flex flex-col gap-1 text-xs text-ink-soft">
           Due date (optional)
           <Input
             type="datetime-local"
@@ -108,13 +88,22 @@ export function ClarifyCard({ task }: { task: Task }) {
         </label>
       </div>
 
-      <div className="mt-4 rounded-lg border border-line bg-canvas/50 p-3">
-        <PriorityMatrix
-          urgency={task.urgency}
-          importance={task.importance}
-          onChange={(p) => updateTask.mutate({ id: task.id, ...p })}
-        />
-      </div>
+      {/* Collapsed by default; a deliberate rating (≠ the 2,2 default) opens it. */}
+      <details
+        open={isRatedPriority(task.urgency, task.importance)}
+        className="mt-4 rounded-lg border border-line bg-canvas/50"
+      >
+        <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-ink-soft">
+          Priority
+        </summary>
+        <div className="px-3 pb-3">
+          <PriorityMatrix
+            urgency={task.urgency}
+            importance={task.importance}
+            onChange={(p) => updateTask.mutate({ id: task.id, ...p })}
+          />
+        </div>
+      </details>
 
       {askWaiting ? (
         <div className="mt-4 flex items-end gap-2">
@@ -175,16 +164,18 @@ export function ClarifyCard({ task }: { task: Task }) {
           onDefer={() => setAskDefer(true)}
           onProject={async () => {
             if (!currentSpace) return;
-            const project = await createProject.mutateAsync({
-              space_id: currentSpace.id,
-              name: task.title,
-              outcome: task.notes,
-            });
+            // The captured item becomes the parent (a task with subtasks IS a
+            // project); seed it with a first planning subtask.
             updateTask.mutate({
               id: task.id,
-              project_id: project.id,
+              status: "next",
+              outcome: task.notes,
+            });
+            await createTask.mutateAsync({
+              space_id: currentSpace.id,
               title: `Define first next action for “${task.title}”`,
               status: "next",
+              parent_task_id: task.id,
             });
           }}
           onTrash={() => deleteTask.mutate(task.id)}

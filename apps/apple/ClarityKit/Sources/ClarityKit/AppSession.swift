@@ -120,7 +120,7 @@ public final class AppSession {
 
     // MARK: Realtime
 
-    /// Subscribe to postgres changes for the current space (tasks, projects,
+    /// Subscribe to postgres changes for the current space (tasks,
     /// task_comments — the tables in the realtime publication) and bump
     /// `remoteVersion` when anything changes. Best-effort: views always
     /// fetch on appear regardless. The iOS/macOS app calls this; the watch
@@ -134,17 +134,12 @@ public final class AppSession {
             self?.realtimeChannel = channel
             let tasks = channel.postgresChange(
                 AnyAction.self, table: "tasks", filter: .eq("space_id", value: spaceId))
-            let projects = channel.postgresChange(
-                AnyAction.self, table: "projects", filter: .eq("space_id", value: spaceId))
             let comments = channel.postgresChange(
                 AnyAction.self, table: "task_comments", filter: .eq("space_id", value: spaceId))
             try? await channel.subscribeWithError()
             await withTaskGroup(of: Void.self) { group in
                 group.addTask { @MainActor [weak self] in
                     for await _ in tasks { self?.noteRemoteChange() }
-                }
-                group.addTask { @MainActor [weak self] in
-                    for await _ in projects { self?.noteRemoteChange() }
                 }
                 group.addTask { @MainActor [weak self] in
                     for await _ in comments { self?.noteRemoteChange() }

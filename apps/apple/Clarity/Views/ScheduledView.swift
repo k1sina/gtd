@@ -7,7 +7,6 @@ import SwiftUI
 struct ScheduledView: View {
     @Environment(AppSession.self) private var session
     @State private var tasks: [TaskItem] = []
-    @State private var projects: [Project] = []
     @State private var subtaskCounts: [UUID: (done: Int, total: Int)] = [:]
     @State private var editing: TaskItem?
     @State private var loading = true
@@ -53,7 +52,7 @@ struct ScheduledView: View {
         .refreshable { await load() }
         .task(id: session.reloadKey) { await load() }
         .sheet(item: $editing) { task in
-            TaskEditView(task: task, projects: projects) { await load() }
+            TaskEditView(task: task) { await load() }
         }
     }
 
@@ -62,10 +61,8 @@ struct ScheduledView: View {
             let ctx = try session.requireContext()
             async let tasksLoad = TaskRepository(ctx)
                 .tasks(statuses: [.inbox, .next, .waiting, .scheduled, .someday])
-            async let projectsLoad = ProjectRepository(ctx).projects()
             tasks = try await tasksLoad
             subtaskCounts = try await TaskRepository(ctx).subtaskCounts(for: tasks.map(\.id))
-            projects = try await projectsLoad
             error = nil
         } catch {
             self.error = error.localizedDescription

@@ -1,12 +1,10 @@
 "use client";
 
 import type {
-  Area,
   Goal,
   Habit,
   HabitLog,
   LifeValue,
-  Project,
   Review,
   Space,
   Task,
@@ -47,9 +45,9 @@ export interface NewTask {
   space_id: string;
   title: string;
   status?: TaskStatus;
-  project_id?: string | null;
   parent_task_id?: string | null;
   notes?: string | null;
+  outcome?: string | null;
   urgency?: number;
   importance?: number;
   due_at?: string | null;
@@ -245,125 +243,6 @@ export function useUndoComplete() {
     },
     onSettled: (_d, _e, { task }) =>
       qc.invalidateQueries({ queryKey: ["tasks", task.space_id] }),
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Projects & areas
-// ---------------------------------------------------------------------------
-
-export function useProjects(spaceId: string | undefined) {
-  const supabase = createClient();
-  return useQuery({
-    queryKey: ["projects", spaceId],
-    enabled: !!spaceId,
-    queryFn: async (): Promise<Project[]> => {
-      const { data, error } = await supabase
-        .from("projects")
-        .select("*")
-        .eq("space_id", spaceId!)
-        .order("sort_order")
-        .order("created_at");
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function useCreateProject() {
-  const supabase = createClient();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (project: {
-      space_id: string;
-      name: string;
-      outcome?: string | null;
-      area_id?: string | null;
-      goal_id?: string | null;
-      status?: string;
-    }): Promise<Project> => {
-      const { data, error } = await supabase
-        .from("projects")
-        .insert(project)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (p) => qc.invalidateQueries({ queryKey: ["projects", p.space_id] }),
-  });
-}
-
-export function useUpdateProject() {
-  const supabase = createClient();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      id,
-      ...patch
-    }: Partial<Project> & { id: string }): Promise<Project> => {
-      const { data, error } = await supabase
-        .from("projects")
-        .update(patch)
-        .eq("id", id)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSettled: (p) => {
-      if (p) qc.invalidateQueries({ queryKey: ["projects", p.space_id] });
-    },
-  });
-}
-
-export function useDeleteProject() {
-  const supabase = createClient();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("projects").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["projects"] });
-      qc.invalidateQueries({ queryKey: ["tasks"] });
-    },
-  });
-}
-
-export function useAreas(spaceId: string | undefined) {
-  const supabase = createClient();
-  return useQuery({
-    queryKey: ["areas", spaceId],
-    enabled: !!spaceId,
-    queryFn: async (): Promise<Area[]> => {
-      const { data, error } = await supabase
-        .from("areas")
-        .select("*")
-        .eq("space_id", spaceId!)
-        .order("sort_order")
-        .order("created_at");
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function useCreateArea() {
-  const supabase = createClient();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (area: { space_id: string; name: string }): Promise<Area> => {
-      const { data, error } = await supabase
-        .from("areas")
-        .insert(area)
-        .select()
-        .single();
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (a) => qc.invalidateQueries({ queryKey: ["areas", a.space_id] }),
   });
 }
 
@@ -1044,9 +923,8 @@ export function useSendChatMessage() {
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ["chat_sessions"] });
       qc.invalidateQueries({ queryKey: ["chat_messages"] });
-      // The assistant may have changed tasks/projects/blocks.
+      // The assistant may have changed tasks/blocks.
       qc.invalidateQueries({ queryKey: ["tasks"] });
-      qc.invalidateQueries({ queryKey: ["projects"] });
       qc.invalidateQueries({ queryKey: ["time_blocks"] });
       void vars;
     },

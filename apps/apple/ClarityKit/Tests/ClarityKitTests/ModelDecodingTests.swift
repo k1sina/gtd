@@ -7,27 +7,39 @@ import Testing
 // come straight from supabase/migrations/20260707000000_init.sql.
 
 @Suite struct ModelDecodingTests {
-    @Test func decodesProjectWithHorizonColumns() throws {
+    @Test func decodesTaskWithOutcomeColumn() throws {
         let json = """
             {
               "id": "6f1b2a34-0000-4000-8000-000000000020",
               "space_id": "6f1b2a34-0000-4000-8000-000000000002",
-              "area_id": "6f1b2a34-0000-4000-8000-000000000021",
-              "goal_id": null,
-              "name": "Garden overhaul",
+              "parent_task_id": null,
+              "created_by": "6f1b2a34-0000-4000-8000-000000000003",
+              "assigned_to": null,
+              "title": "Garden overhaul",
+              "notes": null,
               "outcome": "A usable garden",
-              "status": "on_hold",
+              "status": "next",
+              "urgency": 2,
+              "importance": 2,
+              "due_at": null,
+              "defer_until": null,
+              "estimated_minutes": null,
+              "energy": null,
+              "context_tags": [],
+              "waiting_on": null,
+              "recurrence_rule": null,
+              "recurrence_parent_id": null,
               "sort_order": 2,
-              "reviewed_at": null,
+              "completed_at": null,
+              "external_ref": null,
               "created_at": "2026-07-07T14:42:17.793486+00:00",
-              "completed_at": null
+              "updated_at": "2026-07-07T14:42:17.793486+00:00"
             }
             """.data(using: .utf8)!
-        let project = try PostgrestJSON.decoder.decode(Project.self, from: json)
-        #expect(project.status == .onHold)
-        #expect(project.areaId != nil)
-        #expect(project.goalId == nil)
-        #expect(project.completedAt == nil)
+        let task = try PostgrestJSON.decoder.decode(TaskItem.self, from: json)
+        #expect(task.outcome == "A usable garden")
+        #expect(task.parentTaskId == nil)
+        #expect(task.status == .next)
     }
 
     @Test func decodesSpaceRow() throws {
@@ -45,16 +57,7 @@ import Testing
         #expect(space.name == "Personal")
     }
 
-    @Test func decodesAreaGoalAndValue() throws {
-        let areaJSON = """
-            {"id": "6f1b2a34-0000-4000-8000-000000000021",
-             "space_id": "6f1b2a34-0000-4000-8000-000000000002",
-             "name": "Home", "color": null, "sort_order": 0,
-             "created_at": "2026-07-07T14:42:17+00:00"}
-            """.data(using: .utf8)!
-        let area = try PostgrestJSON.decoder.decode(Area.self, from: areaJSON)
-        #expect(area.name == "Home")
-
+    @Test func decodesGoalAndValue() throws {
         let goalJSON = """
             {"id": "6f1b2a34-0000-4000-8000-000000000030",
              "user_id": "6f1b2a34-0000-4000-8000-000000000003",

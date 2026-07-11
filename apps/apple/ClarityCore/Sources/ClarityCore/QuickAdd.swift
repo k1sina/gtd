@@ -15,7 +15,7 @@ public struct ParsedQuickAdd: Equatable, Sendable {
     public var title: String
     public var dueAt: Date?
     public var tags: [String]
-    public var projectHint: String?
+    public var parentHint: String?
     public var urgency: Int?
     public var importance: Int?
     public var someday: Bool
@@ -38,7 +38,7 @@ public func parseQuickAdd(
         title: "",
         dueAt: nil,
         tags: [],
-        projectHint: nil,
+        parentHint: nil,
         urgency: nil,
         importance: nil,
         someday: false,
@@ -85,7 +85,7 @@ public func parseQuickAdd(
         }
     }
 
-    // --- tags & project ------------------------------------------------------
+    // --- tags & parent ---------------------------------------------------------
     do {
         let re = try! NSRegularExpression(pattern: #"\s@([\w-]+)"#)
         let full = NSRange(text.startIndex..., in: text)
@@ -98,7 +98,7 @@ public func parseQuickAdd(
     }
 
     eat(#"\s#([\w][\w-]*)"#) { m in
-        out.projectHint = m[1]
+        out.parentHint = m[1]
     }
 
     // --- priority ------------------------------------------------------------

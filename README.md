@@ -11,17 +11,18 @@ with a partner.
 - **Capture** — global quick-add (press `N` or `⌘K`) with natural-language
   parsing: `Call mom tomorrow 3pm @phone #Family !urgent ~15m every week`
 - **Clarify** — guided inbox triage: 2-minute rule, next action, waiting-for,
-  someday, convert to project, trash
-- **Organize** — projects with subtasks and desired outcomes, areas of focus,
+  someday, convert to project (a task with subtasks IS a project), trash
+- **Organize** — nested subtasks with desired outcomes and stalled detection,
   context tags, energy levels, defer dates
-- **Engage** — Today view, Next Actions (filter by context/energy),
-  Eisenhower priority matrix (urgency × importance) with drag-and-drop
+- **Engage** — Today view and Next Actions (filter by context/energy) that
+  surface each project's next actionable subtask; optional Eisenhower
+  urgency × importance rating per task
 - **Recurrence & habits** — repeating tasks (RRULE subset) that respawn on
   completion; habit tracker with weekly grid and streaks
 - **Review** — guided weekly review wizard (inbox zero → calendar → stalled
   projects → waiting-for → someday → weekly priorities) with streaks;
   quarterly review that scores goals and seeds the next quarter
-- **Horizons** — life values and quarterly goals, linked to projects
+- **Horizons** — life values and quarterly goals
 - **Search** — Postgres full-text search across tasks and notes
 
 ## Stack
@@ -30,7 +31,7 @@ with a partner.
 - `apps/apple` — SwiftUI apps for iPhone, Mac, and Apple Watch plus Siri
   App Intents (XcodeGen project; see `apps/apple/README.md`)
 - `apps/mcp` — MCP stdio server: lets Claude apps command your GTD data
-  with the same 7 tools as the built-in assistant (see `.mcp.json`)
+  with the same 5 tools as the built-in assistant (see `.mcp.json`)
 - `packages/shared` — dependency-free domain logic (priority scoring,
   recurrence engine, NL parser) with Vitest tests; mirrored in Swift as
   `apps/apple/ClarityCore`

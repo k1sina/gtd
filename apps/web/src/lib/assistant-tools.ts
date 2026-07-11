@@ -7,6 +7,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   isDeferred,
+  isStalledParent,
   nextOccurrenceInsert,
   planDay,
   priorityScore,
@@ -24,7 +25,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
   {
     name: "list_tasks",
     description:
-      "List the user's tasks. Call this before answering questions about workload, priorities, overdue items, or what to do next. Returns id, title, status, urgency/importance (1-4), quadrant, due date, project, tags, estimate.",
+      "List the user's tasks. Call this before answering questions about workload, priorities, overdue items, or what to do next. Returns id, title, status, urgency/importance (1-4), quadrant, due date, tags, estimate. A task with has_subtasks is a project; stalled means it has no actionable next-step subtask. Pass parent_task_id to list a task's subtasks.",
     input_schema: {
       type: "object",
       properties: {
@@ -33,7 +34,10 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
           enum: ["inbox", "next", "waiting", "scheduled", "someday", "done", "all_open"],
           description: "Filter by status. 'all_open' = everything not done/cancelled.",
         },
-        project_id: { type: "string", description: "Only tasks in this project" },
+        parent_task_id: {
+          type: "string",
+          description: "List the subtasks of this task instead of top-level tasks",
+        },
         due_within_days: {
           type: "number",
           description: "Only tasks due within N days (includes overdue)",
@@ -55,7 +59,15 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
           enum: ["inbox", "next", "waiting", "scheduled", "someday"],
         },
         notes: { type: "string" },
-        project_id: { type: "string" },
+        outcome: {
+          type: "string",
+          description: "For multi-step outcomes: what does 'done' look like?",
+        },
+        parent_task_id: {
+          type: "string",
+          description:
+            "Make this a subtask of that task — use to build project structures (a task with subtasks is a project)",
+        },
         due_at: { type: "string", description: "ISO 8601 datetime" },
         urgency: { type: "number", description: "1-4" },
         importance: { type: "number", description: "1-4" },
@@ -73,13 +85,14 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
   {
     name: "update_task",
     description:
-      "Update fields on an existing task: reprioritise (urgency/importance), reschedule (due_at), change status, move to a project, edit title/notes. Get the task id from list_tasks first.",
+      "Update fields on an existing task: reprioritise (urgency/importance), reschedule (due_at), change status, nest it under a parent task, edit title/notes/outcome. Get the task id from list_tasks first.",
     input_schema: {
       type: "object",
       properties: {
         task_id: { type: "string" },
         title: { type: "string" },
         notes: { type: "string" },
+        outcome: { type: "string" },
         status: {
           type: "string",
           enum: ["inbox", "next", "waiting", "scheduled", "someday", "cancelled"],
@@ -88,7 +101,10 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
         importance: { type: "number" },
         due_at: { type: "string", description: "ISO 8601, or empty string to clear" },
         defer_until: { type: "string" },
-        project_id: { type: "string" },
+        parent_task_id: {
+          type: "string",
+          description: "Move under this parent task, or empty string to make top-level",
+        },
         estimated_minutes: { type: "number" },
         waiting_on: { type: "string" },
       },
@@ -103,24 +119,6 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: { task_id: { type: "string" } },
       required: ["task_id"],
-    },
-  },
-  {
-    name: "list_projects",
-    description:
-      "List the user's projects with open/done task counts and whether each active project is missing a next action (stalled). Use for project reviews and weekly-review help.",
-    input_schema: { type: "object", properties: {}, required: [] },
-  },
-  {
-    name: "create_project",
-    description: "Create a new project (any outcome needing more than one action).",
-    input_schema: {
-      type: "object",
-      properties: {
-        name: { type: "string" },
-        outcome: { type: "string", description: "What does 'done' look like?" },
-      },
-      required: ["name"],
     },
   },
   {
@@ -142,7 +140,7 @@ type ToolInput = Record<string, unknown>;
 async function listTasks(ctx: ToolContext, input: ToolInput) {
   let query = ctx.supabase
     .from("tasks")
-    .select("id, title, status, urgency, importance, due_at, defer_until, estimated_minutes, context_tags, waiting_on, recurrence_rule, project_id, parent_task_id, notes")
+    .select("id, title, status, urgency, importance, due_at, defer_until, estimated_minutes, context_tags, waiting_on, recurrence_rule, outcome, parent_task_id, sort_order, created_at, notes")
     .eq("space_id", ctx.spaceId);
 
   const status = input.status as string | undefined;
@@ -160,13 +158,25 @@ async function listTasks(ctx: ToolContext, input: ToolInput) {
   if (error) throw new Error(error.message);
 
   const now = new Date();
-  let tasks = (data ?? []).filter((t) => !t.parent_task_id);
+  const all = data ?? [];
+  // has_subtasks/stalled are computed against the full fetch, before the
+  // ranked output is narrowed to one level of the tree.
+  const openChildCounts = new Map<string, number>();
+  for (const t of all) {
+    if (t.parent_task_id && !["done", "cancelled"].includes(t.status)) {
+      openChildCounts.set(
+        t.parent_task_id,
+        (openChildCounts.get(t.parent_task_id) ?? 0) + 1
+      );
+    }
+  }
+
+  let tasks = input.parent_task_id
+    ? all.filter((t) => t.parent_task_id === input.parent_task_id)
+    : all.filter((t) => !t.parent_task_id);
   if (input.due_within_days != null) {
     const cutoff = new Date(now.getTime() + Number(input.due_within_days) * 86400000);
     tasks = tasks.filter((t) => t.due_at && new Date(t.due_at) <= cutoff);
-  }
-  if (input.project_id) {
-    tasks = tasks.filter((t) => t.project_id === input.project_id);
   }
 
   return tasks
@@ -184,7 +194,9 @@ async function listTasks(ctx: ToolContext, input: ToolInput) {
       tags: t.context_tags,
       waiting_on: t.waiting_on,
       recurring: t.recurrence_rule,
-      project_id: t.project_id,
+      outcome: t.outcome,
+      has_subtasks: (openChildCounts.get(t.id) ?? 0) > 0,
+      stalled: isStalledParent(t, all, now),
       notes: t.notes?.slice(0, 200) ?? null,
     }));
 }
@@ -198,7 +210,8 @@ async function createTask(ctx: ToolContext, input: ToolInput) {
       title: input.title,
       status: input.status ?? "inbox",
       notes: input.notes ?? null,
-      project_id: input.project_id ?? null,
+      outcome: input.outcome ?? null,
+      parent_task_id: input.parent_task_id ?? null,
       due_at: input.due_at || null,
       urgency: input.urgency ?? 2,
       importance: input.importance ?? 2,
@@ -218,16 +231,16 @@ async function updateTask(ctx: ToolContext, input: ToolInput) {
   for (const key of [
     "title",
     "notes",
+    "outcome",
     "status",
     "urgency",
     "importance",
-    "project_id",
     "estimated_minutes",
     "waiting_on",
   ]) {
     if (input[key] !== undefined) patch[key] = input[key];
   }
-  for (const key of ["due_at", "defer_until"]) {
+  for (const key of ["due_at", "defer_until", "parent_task_id"]) {
     if (input[key] !== undefined) patch[key] = input[key] === "" ? null : input[key];
   }
   const { data, error } = await ctx.supabase
@@ -266,53 +279,6 @@ async function completeTask(ctx: ToolContext, input: ToolInput) {
     }
   }
   return { completed: task.title, next_occurrence: insert?.due_at ?? null };
-}
-
-async function listProjects(ctx: ToolContext) {
-  const [{ data: projects, error }, { data: tasks }] = await Promise.all([
-    ctx.supabase
-      .from("projects")
-      .select("id, name, outcome, status")
-      .eq("space_id", ctx.spaceId),
-    ctx.supabase
-      .from("tasks")
-      .select("id, project_id, status, parent_task_id")
-      .eq("space_id", ctx.spaceId),
-  ]);
-  if (error) throw new Error(error.message);
-
-  return (projects ?? []).map((p) => {
-    const projectTasks = (tasks ?? []).filter(
-      (t) => t.project_id === p.id && !t.parent_task_id
-    );
-    const open = projectTasks.filter(
-      (t) => !["done", "cancelled"].includes(t.status)
-    );
-    return {
-      id: p.id,
-      name: p.name,
-      outcome: p.outcome,
-      status: p.status,
-      open_tasks: open.length,
-      done_tasks: projectTasks.length - open.length,
-      stalled:
-        p.status === "active" && !open.some((t) => t.status === "next"),
-    };
-  });
-}
-
-async function createProject(ctx: ToolContext, input: ToolInput) {
-  const { data, error } = await ctx.supabase
-    .from("projects")
-    .insert({
-      space_id: ctx.spaceId,
-      name: input.name,
-      outcome: input.outcome ?? null,
-    })
-    .select("id, name")
-    .single();
-  if (error) throw new Error(error.message);
-  return { created: data };
 }
 
 async function planToday(ctx: ToolContext) {
@@ -409,10 +375,6 @@ export async function executeAssistantTool(
       return updateTask(ctx, input);
     case "complete_task":
       return completeTask(ctx, input);
-    case "list_projects":
-      return listProjects(ctx);
-    case "create_project":
-      return createProject(ctx, input);
     case "plan_day":
       return planToday(ctx);
     default:

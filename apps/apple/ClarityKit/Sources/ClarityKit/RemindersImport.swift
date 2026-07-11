@@ -7,12 +7,15 @@ import Foundation
 // the EventKit reader in the app target stays a thin adapter:
 //   list Inbox → status inbox · Soon → next · Waiting → waiting ·
 //   Someday → someday · any other list → next (its items are clarified).
-//   Sections → projects; other lists themselves → projects. The four status
-//   lists above never become projects.
+//   Sections → parent tasks; other lists themselves → parent tasks (a task
+//   with subtasks is Clarity's project). The four status lists above never
+//   become parents.
 //   Completed reminders → status done + completed_at.
-//   Subtasks keep their hierarchy via parent_task_id.
-//   Every task gets external_ref = "apple-reminders:<externalId>" so re-runs
-//   skip what was already imported (unique index on space_id, external_ref).
+//   Subtasks keep their hierarchy via parent_task_id (nested under the
+//   list/section parent, so reminder-level subtasks land at depth 2).
+//   Every task gets external_ref = "apple-reminders:<externalId>" (parents
+//   created from lists get "apple-reminders-list:<name>") so re-runs skip
+//   what was already imported (unique index on space_id, external_ref).
 
 /// Platform-neutral snapshot of one reminder, as handed over by the EventKit
 /// adapter (or fixtures in tests).
@@ -112,9 +115,9 @@ public enum RemindersImport {
         }
     }
 
-    /// Sections always become projects; non-status lists become projects for
-    /// their unsectioned reminders.
-    public static func projectName(listName: String, sectionName: String?) -> String? {
+    /// Sections always become parent tasks; non-status lists become parents
+    /// for their unsectioned reminders.
+    public static func parentTitle(listName: String, sectionName: String?) -> String? {
         if let sectionName, !sectionName.trimmingCharacters(in: .whitespaces).isEmpty {
             return sectionName
         }
@@ -164,38 +167,46 @@ public enum RemindersImport {
         return calendar.date(bySettingHour: 23, minute: 59, second: 0, of: start) ?? due
     }
 
-    /// Project names the import needs but that don't exist yet in the space
-    /// (case-insensitive), in first-appearance order.
-    public static func missingProjectNames(
-        for reminders: [ImportedReminder], existing: [Project]
+    /// external_ref for a parent task created from a list/section, so re-runs
+    /// find it again instead of duplicating it.
+    public static func parentExternalRef(for title: String) -> String {
+        "apple-reminders-list:" + title.lowercased()
+    }
+
+    /// Parent titles the import needs but that don't exist yet among the
+    /// space's top-level tasks (case-insensitive), in first-appearance order.
+    public static func missingParentTitles(
+        for reminders: [ImportedReminder], existing: [TaskItem]
     ) -> [String] {
-        let existingNames = Set(existing.map { $0.name.lowercased() })
+        let existingTitles = Set(
+            existing.filter { $0.parentTaskId == nil }.map { $0.title.lowercased() })
         var seen = Set<String>()
         var missing: [String] = []
         for reminder in reminders {
             guard
-                let name = projectName(
+                let title = parentTitle(
                     listName: reminder.listName, sectionName: reminder.sectionName),
-                !existingNames.contains(name.lowercased()),
-                seen.insert(name.lowercased()).inserted
+                !existingTitles.contains(title.lowercased()),
+                seen.insert(title.lowercased()).inserted
             else { continue }
-            missing.append(name)
+            missing.append(title)
         }
         return missing
     }
 
-    /// One reminder → one insert payload. `projectIds` is keyed by lowercased
-    /// project name; `parentTaskId` is resolved by the caller once parents
-    /// have ids.
+    /// One reminder → one insert payload. `parentIds` is keyed by lowercased
+    /// list/section parent title; `parentTaskId` (set by the caller once
+    /// reminder-level parents have ids) wins over the list/section parent, so
+    /// reminder subtasks nest under their own parent (depth 2 overall).
     public static func payload(
         for reminder: ImportedReminder,
         spaceId: UUID,
         userId: UUID,
-        projectIds: [String: UUID],
+        parentIds: [String: UUID],
         parentTaskId: UUID? = nil,
         calendar: Calendar = .current
     ) -> NewTaskPayload {
-        let project = projectName(
+        let listParent = parentTitle(
             listName: reminder.listName, sectionName: reminder.sectionName)
         let title = reminder.title.trimmingCharacters(in: .whitespacesAndNewlines)
         let notes = reminder.notes?.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -205,8 +216,7 @@ public enum RemindersImport {
             title: title.isEmpty ? "Untitled" : title,
             notes: (notes?.isEmpty ?? true) ? nil : notes,
             status: reminder.isCompleted ? .done : status(forList: reminder.listName),
-            projectId: project.flatMap { projectIds[$0.lowercased()] },
-            parentTaskId: parentTaskId,
+            parentTaskId: parentTaskId ?? listParent.flatMap { parentIds[$0.lowercased()] },
             urgency: urgency(forPriority: reminder.priority),
             dueAt: dueAt(for: reminder, calendar: calendar),
             contextTags: reminder.tags,
@@ -222,7 +232,8 @@ public struct RemindersImportSummary: Sendable {
     public var importedTasks = 0
     public var importedSubtasks = 0
     public var skippedExisting = 0
-    public var createdProjects: [String] = []
+    /// Titles of parent tasks created from lists/sections this run.
+    public var createdParents: [String] = []
     /// Titles whose recurrence rule couldn't be expressed and was dropped.
     public var droppedRecurrences: [String] = []
     /// Subtasks whose parent wasn't part of the import (or previously
@@ -246,7 +257,6 @@ public struct RemindersImporter: Sendable {
     ) async throws -> RemindersImportSummary {
         var summary = RemindersImportSummary()
         let tasks = TaskRepository(ctx)
-        let projectRepo = ProjectRepository(ctx)
 
         // Skip reminders imported by a previous run.
         var refToTaskId = try await tasks.externalRefs()
@@ -255,17 +265,21 @@ public struct RemindersImporter: Sendable {
         }
         summary.skippedExisting = reminders.count - fresh.count
 
-        // Ensure every needed project exists.
-        let existingProjects = try await projectRepo.projects()
-        var projectIds = [String: UUID](
-            existingProjects.map { ($0.name.lowercased(), $0.id) },
+        // Ensure every needed list/section parent task exists.
+        let existingTasks = try await tasks.tasks(topLevelOnly: true)
+        var parentIds = [String: UUID](
+            existingTasks.map { ($0.title.lowercased(), $0.id) },
             uniquingKeysWith: { first, _ in first })
-        for name in RemindersImport.missingProjectNames(
-            for: fresh, existing: existingProjects)
+        for title in RemindersImport.missingParentTitles(
+            for: fresh, existing: existingTasks)
         {
-            let project = try await projectRepo.create(name: name)
-            projectIds[name.lowercased()] = project.id
-            summary.createdProjects.append(name)
+            let parent = try await tasks.create(
+                NewTaskPayload(
+                    spaceId: ctx.spaceId, createdBy: ctx.userId, title: title,
+                    status: .next,
+                    externalRef: RemindersImport.parentExternalRef(for: title)))
+            parentIds[title.lowercased()] = parent.id
+            summary.createdParents.append(title)
         }
 
         for reminder in fresh
@@ -290,7 +304,7 @@ public struct RemindersImporter: Sendable {
             parents.map {
                 RemindersImport.payload(
                     for: $0, spaceId: ctx.spaceId, userId: ctx.userId,
-                    projectIds: projectIds, calendar: calendar)
+                    parentIds: parentIds, calendar: calendar)
             })
         summary.importedTasks = inserted.count
         for task in inserted {
@@ -305,7 +319,7 @@ public struct RemindersImporter: Sendable {
             children.map { reminder in
                 RemindersImport.payload(
                     for: reminder, spaceId: ctx.spaceId, userId: ctx.userId,
-                    projectIds: projectIds,
+                    parentIds: parentIds,
                     parentTaskId: reminder.parentExternalId.flatMap {
                         refToTaskId[RemindersImport.externalRef(for: $0)]
                     },

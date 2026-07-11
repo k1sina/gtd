@@ -3,7 +3,7 @@ import ClarityKit
 import SwiftUI
 
 /// One-way import of Apple Reminders into the current space. Lists and
-/// sections become projects, list names map onto GTD statuses, completed
+/// sections become parent tasks, list names map onto GTD statuses, completed
 /// reminders arrive as done tasks. Safe to re-run: previously imported
 /// reminders are skipped via tasks.external_ref.
 struct RemindersImportView: View {
@@ -71,7 +71,7 @@ struct RemindersImportView: View {
             .listStyle(.bordered)
             #endif
             Toggle("Include completed reminders", isOn: $includeCompleted)
-            Text("Lists and sections become projects; completed reminders "
+            Text("Lists and sections become parent tasks; completed reminders "
                 + "become done tasks. Sections, tags, and sub-task grouping "
                 + "aren’t exposed by Apple’s Reminders API, so those import "
                 + "flat.")
@@ -118,8 +118,8 @@ struct RemindersImportView: View {
             systemImage: "checkmark.circle.fill")
             .foregroundStyle(.green)
         VStack(alignment: .leading, spacing: 6) {
-            if !summary.createdProjects.isEmpty {
-                Text("New projects: \(summary.createdProjects.joined(separator: ", "))")
+            if !summary.createdParents.isEmpty {
+                Text("New parent tasks: \(summary.createdParents.joined(separator: ", "))")
             }
             if summary.skippedExisting > 0 {
                 Text("\(summary.skippedExisting) already imported earlier — skipped.")

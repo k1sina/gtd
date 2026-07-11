@@ -52,8 +52,8 @@ This runs two Swift Testing suites (31 tests):
   quick-add parser. These are line-for-line mirrors of the vitest suites in
   `packages/shared/test`; the expected values must stay identical.
 - **ClarityKit** — JSON decode/encode fixtures against real PostgREST row
-  shapes, the recurring-completion payload logic, project summaries, and
-  habit date keys.
+  shapes, the recurring-completion payload logic, stalled-parent detection,
+  and habit date keys.
 
 The script works with full Xcode *or* with Command Line Tools alone (it
 points the toolchain at the Testing framework the CLT ships).
@@ -115,8 +115,8 @@ Sign in with your Clarity account (created on the web). The session persists
 in the keychain; you won't be asked again.
 
 The iPhone app has five tabs — **Today, Inbox, Next, Browse, Settings** —
-where Browse holds everything else (Scheduled, Waiting, Someday, Projects,
-Matrix, Habits, Reviews, Goals, Assistant, Search). The Mac app shows all
+where Browse holds everything else (Scheduled, Waiting, Someday, Habits,
+Reviews, Goals, Assistant, Search). The Mac app shows all
 sections in a grouped sidebar, with the **space switcher** at the top
 (switch spaces, create a shared space, or join one from a pasted invite
 link; on iPhone the switcher is in each tab's toolbar).
@@ -125,7 +125,11 @@ link; on iPhone the switcher is in each tab's toolbar).
 - **Due & overdue** — everything dated before end of today, ranked by
   priority (importance beats urgency; overdue items get a boost).
 - **Top priorities** — the 5 highest-leverage next actions that aren't
-  already listed above (deferred tasks are excluded).
+  already listed above (deferred tasks are excluded). A task with subtasks
+  shows its first actionable subtask as the action line (parent title above
+  it, in small type); the circle completes the subtask, tapping opens the
+  parent. A red **stalled** label means no subtask is an actionable next
+  step.
 - **Habit strip** — today's due habits as tappable chips (with 🔥 streaks).
 - **Schedule** — calendar events + focus blocks; **Plan my day** asks the
   server to propose blocks, then Confirm (syncs to Google Calendar when
@@ -142,11 +146,12 @@ link; on iPhone the switcher is in each tab's toolbar).
 - Raw captures land here. Clarify with swipes:
   - swipe **right** → *Next* (it's actionable)
   - swipe **left** → *Someday* or *Delete*
-  - tap → full editor (status, project, priority, dates, recurrence, tags…)
+  - tap → full editor (status, priority, dates, recurrence, tags, subtasks…)
 - The **Clarify** toolbar button walks the inbox one item at a time with
   the full GTD decision set: *Did it (2-min rule)*, *Next*, *Schedule*,
-  *Waiting for…*, *Someday*, *It's a project* (spawns a project + seed
-  task), *Trash* — same flow as the web.
+  *Waiting for…*, *Someday*, *It's a project* (the item becomes a parent
+  task with a "define first next action" seed subtask), *Trash* — same
+  flow as the web.
 
 ### Next
 - Every next action, highest leverage first. The colored dot is the
@@ -161,20 +166,16 @@ link; on iPhone the switcher is in each tab's toolbar).
   your plate).
 - **Someday/maybe** parks ideas; swipe right to activate.
 
-### Projects
-- Grouped by **area of focus** ("No area" last), with progress bars and an
-  orange **stalled** badge when an active project has no next action.
-- The **+** button opens the create dialog (name, outcome, area — or create
-  a new area inline).
-- Project detail: edit name/outcome inline, change status (completing
-  stamps the completion date), assign an area, delete (with confirmation),
-  and add tasks straight into the project. Subtasks show indented with
-  done/total counts.
+### Projects = tasks with subtasks
+- There is no separate Projects screen: any task with subtasks IS a project.
+  Open a task's editor to add subtasks (nesting allowed), give it an
+  **outcome** ("what does done look like?"), and watch for the red
+  **stalled** label in lists when no subtask is an actionable next step.
 
-### Matrix, Habits, Reviews, Goals, Assistant, Search
-- **Priority matrix** — the four Eisenhower quadrants. Drag tasks between
-  quadrants on Mac/iPad; on iPhone long-press → *Move to…*. Dropping sets
-  the quadrant's representative urgency/importance (same values as web).
+### Habits, Reviews, Goals, Assistant, Search
+- **Priority** — the Eisenhower matrix lives in the task editor as a
+  collapsed "Priority" row; it auto-expands for tasks that were already
+  rated (anything other than the 2,2 default).
 - **Habits** — current week Mon–Sun grid per habit, streaks, create with
   weekday selection, swipe to archive.
 - **Reviews** — weekly (6 guided steps; progress persists mid-review and
@@ -183,8 +184,8 @@ link; on iPhone the switcher is in each tab's toolbar).
 - **Goals & values** — life values and quarterly goals with value links,
   statuses, and scores.
 - **Assistant** — the same GTD coach as the web `/assistant` page; it can
-  read and change your tasks/projects and plan your day. Requires the web
-  deployment to have `ANTHROPIC_API_KEY` set.
+  read and change your tasks (including subtasks) and plan your day.
+  Requires the web deployment to have `ANTHROPIC_API_KEY` set.
 - **Search** — full-text over titles and notes.
 
 ### Settings
@@ -197,11 +198,12 @@ link; on iPhone the switcher is in each tab's toolbar).
 - **Data → Import from Apple Reminders…** (iPhone/Mac) — one-way import
   into the current space. Grant Reminders access when prompted, pick lists
   (grocery-style lists are deselected by default), optionally include
-  completed reminders. Lists/sections become projects; list names map to
-  GTD statuses (Inbox→inbox, Soon/Next→next, Waiting→waiting,
-  Someday→someday, anything else→next). Re-running skips everything
-  already imported (`tasks.external_ref`). Apple's EventKit API does not
-  expose sections, tags, or sub-task grouping, so those import flat.
+  completed reminders. Lists/sections become parent tasks (a task with
+  subtasks is Clarity's project); list names map to GTD statuses
+  (Inbox→inbox, Soon/Next→next, Waiting→waiting, Someday→someday,
+  anything else→next). Re-running skips everything already imported
+  (`tasks.external_ref`). Apple's EventKit API does not expose sections,
+  tags, or sub-task grouping, so those import flat.
 
 ### Sharing & realtime
 - Create a shared space from the space switcher, invite by email, copy the
@@ -221,21 +223,22 @@ field preview what the parser understood before you commit.
 | `tomorrow`, `today`, `tonight`, `friday`, `next monday`, `next week`, `next month`, `in 3 days`, `in 2 weeks` | due date (defaults to 17:00; `tonight` = 20:00) |
 | `at 3pm`, `at 15:30`, `9am` | due time (time without a date = the next such time) |
 | `@phone @home` | context tags |
-| `#Family` | files into the project whose name matches |
+| `#Family` | files as a subtask of the open top-level task whose title matches |
 | `!urgent` / `!important` | urgency / importance = 4 |
 | `!someday` | goes to Someday instead of Inbox |
 | `~15m`, `~2h`, `~1h30m` | time estimate |
 | `every day`, `every 3 days`, `every monday`, `every weekday`, `every 2 weeks`, `every month` | repeating task (RRULE) |
 
 Example: `Call mom tomorrow at 3pm @phone #Family !urgent ~15m` →
-"Call mom", due tomorrow 15:00, tag *phone*, project *Family*, urgency 4,
+"Call mom", due tomorrow 15:00, tag *phone*, subtask of *Family*, urgency 4,
 15-minute estimate.
 
 ### Task editor
 Tap any task row. You can change status (inbox/next/waiting/scheduled/
-someday/done/cancelled), project, urgency/importance steppers (with live
-quadrant preview), due & defer dates, repeat rule, estimate, energy, and
-tags. *Waiting* status reveals a "waiting on" field.
+someday/done/cancelled), the collapsed Priority matrix row (auto-expands
+when the task is rated), due & defer dates, repeat rule, estimate, energy,
+tags, subtasks, and — once a task has subtasks — its outcome line.
+*Waiting* status reveals a "waiting on" field.
 
 ## 6. Using the Watch app
 

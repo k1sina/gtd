@@ -5,6 +5,7 @@
 import {
   DEFAULT_PLANNER_CONFIG,
   isDeferred,
+  isStalledParent,
   nextOccurrenceInsert,
   planDay,
   priorityScore,
@@ -28,20 +29,36 @@ interface TaskRow {
   context_tags: string[];
   waiting_on: string | null;
   recurrence_rule: string | null;
-  project_id: string | null;
+  outcome: string | null;
   parent_task_id: string | null;
+  sort_order: number;
+  created_at: string;
   notes: string | null;
 }
 
-/** Pure: drop sub-tasks, apply due/project filters, rank by priority. */
+/** Pure: narrow to one tree level, apply the due filter, rank by priority.
+ * has_subtasks/stalled are computed against the full row set first. */
 export function filterAndRankTasks(rows: TaskRow[], input: ToolInput, now: Date) {
-  let tasks = rows.filter((t) => !t.parent_task_id);
+  const openChildCounts = new Map<string, number>();
+  for (const t of rows) {
+    if (t.parent_task_id && !["done", "cancelled"].includes(t.status)) {
+      openChildCounts.set(
+        t.parent_task_id,
+        (openChildCounts.get(t.parent_task_id) ?? 0) + 1
+      );
+    }
+  }
+  const nodes = rows.map((t) => ({
+    ...t,
+    status: t.status as import("@gtd/shared").TaskStatus,
+  }));
+
+  let tasks = input.parent_task_id
+    ? nodes.filter((t) => t.parent_task_id === input.parent_task_id)
+    : nodes.filter((t) => !t.parent_task_id);
   if (input.due_within_days != null) {
     const cutoff = new Date(now.getTime() + Number(input.due_within_days) * 86400000);
     tasks = tasks.filter((t) => t.due_at && new Date(t.due_at) <= cutoff);
-  }
-  if (input.project_id) {
-    tasks = tasks.filter((t) => t.project_id === input.project_id);
   }
   return tasks
     .sort(
@@ -62,27 +79,29 @@ export function filterAndRankTasks(rows: TaskRow[], input: ToolInput, now: Date)
       tags: t.context_tags,
       waiting_on: t.waiting_on,
       recurring: t.recurrence_rule,
-      project_id: t.project_id,
+      outcome: t.outcome,
+      has_subtasks: (openChildCounts.get(t.id) ?? 0) > 0,
+      stalled: isStalledParent(t, nodes, now),
       notes: t.notes?.slice(0, 200) ?? null,
     }));
 }
 
-/** Pure: whitelist update fields; empty-string due/defer clears the column. */
+/** Pure: whitelist update fields; empty-string due/defer/parent clears the column. */
 export function buildUpdatePatch(input: ToolInput): Record<string, unknown> {
   const patch: Record<string, unknown> = {};
   for (const key of [
     "title",
     "notes",
+    "outcome",
     "status",
     "urgency",
     "importance",
-    "project_id",
     "estimated_minutes",
     "waiting_on",
   ]) {
     if (input[key] !== undefined) patch[key] = input[key];
   }
-  for (const key of ["due_at", "defer_until"]) {
+  for (const key of ["due_at", "defer_until", "parent_task_id"]) {
     if (input[key] !== undefined) patch[key] = input[key] === "" ? null : input[key];
   }
   return patch;
@@ -92,7 +111,7 @@ async function listTasks(ctx: ToolContext, input: ToolInput) {
   let query = ctx.supabase
     .from("tasks")
     .select(
-      "id, title, status, urgency, importance, due_at, defer_until, estimated_minutes, context_tags, waiting_on, recurrence_rule, project_id, parent_task_id, notes"
+      "id, title, status, urgency, importance, due_at, defer_until, estimated_minutes, context_tags, waiting_on, recurrence_rule, outcome, parent_task_id, sort_order, created_at, notes"
     )
     .eq("space_id", ctx.spaceId);
 
@@ -122,7 +141,8 @@ async function createTask(ctx: ToolContext, input: ToolInput) {
       title: input.title,
       status: input.status ?? "inbox",
       notes: input.notes ?? null,
-      project_id: input.project_id ?? null,
+      outcome: input.outcome ?? null,
+      parent_task_id: input.parent_task_id ?? null,
       due_at: input.due_at || null,
       urgency: input.urgency ?? 2,
       importance: input.importance ?? 2,
@@ -174,52 +194,6 @@ async function completeTask(ctx: ToolContext, input: ToolInput) {
     }
   }
   return { completed: task.title, next_occurrence: insert?.due_at ?? null };
-}
-
-async function listProjects(ctx: ToolContext) {
-  const [{ data: projects, error }, { data: tasks }] = await Promise.all([
-    ctx.supabase
-      .from("projects")
-      .select("id, name, outcome, status")
-      .eq("space_id", ctx.spaceId),
-    ctx.supabase
-      .from("tasks")
-      .select("id, project_id, status, parent_task_id")
-      .eq("space_id", ctx.spaceId),
-  ]);
-  if (error) throw new Error(error.message);
-
-  return (projects ?? []).map((p) => {
-    const projectTasks = (tasks ?? []).filter(
-      (t) => t.project_id === p.id && !t.parent_task_id
-    );
-    const open = projectTasks.filter(
-      (t) => !["done", "cancelled"].includes(t.status)
-    );
-    return {
-      id: p.id,
-      name: p.name,
-      outcome: p.outcome,
-      status: p.status,
-      open_tasks: open.length,
-      done_tasks: projectTasks.length - open.length,
-      stalled: p.status === "active" && !open.some((t) => t.status === "next"),
-    };
-  });
-}
-
-async function createProject(ctx: ToolContext, input: ToolInput) {
-  const { data, error } = await ctx.supabase
-    .from("projects")
-    .insert({
-      space_id: ctx.spaceId,
-      name: input.name,
-      outcome: input.outcome ?? null,
-    })
-    .select("id, name")
-    .single();
-  if (error) throw new Error(error.message);
-  return { created: data };
 }
 
 async function planToday(ctx: ToolContext) {
@@ -319,10 +293,6 @@ export async function executeTool(
       return updateTask(ctx, input);
     case "complete_task":
       return completeTask(ctx, input);
-    case "list_projects":
-      return listProjects(ctx);
-    case "create_project":
-      return createProject(ctx, input);
     case "plan_day":
       return planToday(ctx);
     default:

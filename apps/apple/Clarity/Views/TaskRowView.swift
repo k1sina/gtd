@@ -3,25 +3,43 @@ import ClarityKit
 import SwiftUI
 
 /// One task line: complete button, title + due/recurrence hints, quadrant dot.
+/// When `actionSubtask` is set (the surfaced next action of a parent task),
+/// the subtask becomes the action line and the complete button completes it;
+/// tapping the row still opens the parent.
 struct TaskRowView: View {
     let task: TaskItem
     var dimmed = false
     var subtaskStats: (done: Int, total: Int)?
+    var actionSubtask: TaskItem?
+    var stalled = false
     let onComplete: () -> Void
     let onTap: () -> Void
+
+    /// What the checkbox and main line represent.
+    private var actionTask: TaskItem { actionSubtask ?? task }
 
     var body: some View {
         HStack(spacing: 10) {
             Button(action: onComplete) {
-                Image(systemName: task.status == .done ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(task.status == .done ? Color.green : Color.secondary)
+                Image(systemName: actionTask.status == .done ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(actionTask.status == .done ? Color.green : Color.secondary)
             }
             .buttonStyle(.plain)
 
             VStack(alignment: .leading, spacing: 2) {
-                Text(task.title)
-                    .strikethrough(task.status == .done)
+                if actionSubtask != nil {
+                    Text(task.title)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+                Text(actionTask.title)
+                    .strikethrough(actionTask.status == .done)
                 HStack(spacing: 6) {
+                    if stalled {
+                        Label("stalled", systemImage: "exclamationmark.circle")
+                            .foregroundStyle(.red)
+                    }
                     if let due = task.dueAt {
                         Text(due, style: .relative)
                             .foregroundStyle(due < .now ? .red : .secondary)
@@ -54,7 +72,7 @@ struct TaskRowView: View {
                     .foregroundStyle(.secondary)
             }
             Circle()
-                .fill(task.quadrant.color)
+                .fill(actionTask.quadrant.color)
                 .frame(width: 8, height: 8)
         }
         .opacity(dimmed ? 0.5 : 1)

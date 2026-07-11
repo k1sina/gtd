@@ -8,7 +8,6 @@ struct SearchView: View {
     @Environment(AppSession.self) private var session
     @State private var query = ""
     @State private var results: [TaskItem] = []
-    @State private var projects: [Project] = []
     @State private var subtaskCounts: [UUID: (done: Int, total: Int)] = [:]
     @State private var editing: TaskItem?
     @State private var searching = false
@@ -43,11 +42,8 @@ struct SearchView: View {
         .onChange(of: query) { _, newValue in
             debounceSearch(newValue)
         }
-        .task(id: session.dataEpoch) {
-            projects = (try? await ProjectRepository(session.requireContext()).projects()) ?? []
-        }
         .sheet(item: $editing) { task in
-            TaskEditView(task: task, projects: projects) {
+            TaskEditView(task: task) {
                 await runSearch(query)
             }
         }

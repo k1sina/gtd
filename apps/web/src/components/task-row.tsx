@@ -1,6 +1,6 @@
 "use client";
 
-import type { Project, Task } from "@gtd/shared";
+import type { Task } from "@gtd/shared";
 import { describeRule, quadrant } from "@gtd/shared";
 import clsx from "clsx";
 import {
@@ -35,23 +35,27 @@ const QUADRANT_DOT: Record<string, string> = {
 
 export function TaskRow({
   task,
-  project,
   subtaskStats,
+  actionSubtask = null,
+  stalled = false,
   onOpen,
-  showProject = true,
   indent = false,
 }: {
   task: Task;
-  project?: Project | null;
   subtaskStats?: { done: number; total: number };
+  /** Surfaced next action of a parent task: shown as the action line, and the
+   * checkbox completes it (opening the row still opens the parent). */
+  actionSubtask?: Task | null;
+  stalled?: boolean;
   onOpen?: (task: Task) => void;
-  showProject?: boolean;
   indent?: boolean;
 }) {
   const completeTask = useCompleteTask();
   const undoComplete = useUndoComplete();
   const toast = useToast();
-  const done = task.status === "done";
+  // The checkbox acts on the surfaced subtask when there is one.
+  const actionTask = actionSubtask ?? task;
+  const done = actionTask.status === "done";
   const due = task.due_at ? formatDue(task.due_at) : null;
   const age = waitingAge(task);
   const snoozedUntil =
@@ -65,19 +69,19 @@ export function TaskRow({
   function toggleDone(v: boolean) {
     // Fire the toast at click time: the optimistic update unmounts this row
     // immediately, and unmounted components never receive mutate callbacks.
-    const promise = completeTask.mutateAsync({ task, done: v });
+    const promise = completeTask.mutateAsync({ task: actionTask, done: v });
     promise.catch(() => toast("Couldn’t save that — try again", { tone: "danger" }));
     if (!v) return;
     toast(
-      task.recurrence_rule
+      actionTask.recurrence_rule
         ? "Completed — next occurrence scheduled"
-        : `Completed “${task.title}”`,
+        : `Completed “${actionTask.title}”`,
       {
         action: {
           label: "Undo",
           onClick: () => {
             promise
-              .then((receipt) => undoComplete.mutate({ task, receipt }))
+              .then((receipt) => undoComplete.mutate({ task: actionTask, receipt }))
               .catch(() => {});
           },
         },
@@ -104,13 +108,16 @@ export function TaskRow({
         />
       </div>
       <div className="min-w-0 flex-1">
+        {actionSubtask && (
+          <p className="truncate text-[11px] text-ink-faint">{task.title}</p>
+        )}
         <div className="flex items-center gap-2">
           <span
             className={clsx(
               "h-1.5 w-1.5 shrink-0 rounded-full",
-              QUADRANT_DOT[quadrant(task.urgency, task.importance)]
+              QUADRANT_DOT[quadrant(actionTask.urgency, actionTask.importance)]
             )}
-            title={`urgency ${task.urgency} · importance ${task.importance}`}
+            title={`urgency ${actionTask.urgency} · importance ${actionTask.importance}`}
           />
           <p
             className={clsx(
@@ -118,19 +125,27 @@ export function TaskRow({
               done && "text-ink-faint line-through"
             )}
           >
-            {task.title}
+            {actionTask.title}
           </p>
         </div>
         {(due ||
           snoozedUntil ||
           age ||
+          stalled ||
           task.context_tags.length > 0 ||
-          (showProject && project) ||
           task.recurrence_rule ||
           task.estimated_minutes ||
           task.waiting_on ||
           subtaskStats) && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            {stalled && (
+              <span
+                title="No next action — decide the next step"
+                className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-600"
+              >
+                stalled
+              </span>
+            )}
             {due && (
               <Badge tone={due.tone === "neutral" ? "neutral" : due.tone}>
                 {due.label}
@@ -148,9 +163,6 @@ export function TaskRow({
                 {task.waiting_on ?? "waiting"}
                 {age && <span className="opacity-70">· {age}</span>}
               </Badge>
-            )}
-            {showProject && project && (
-              <Badge tone="accent">{project.name}</Badge>
             )}
             {subtaskStats && subtaskStats.total > 0 && (
               <Badge tone="neutral">

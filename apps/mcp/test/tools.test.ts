@@ -3,6 +3,7 @@ import { buildUpdatePatch, filterAndRankTasks } from "../src/tools";
 
 const now = new Date("2026-07-07T10:00:00");
 
+let seq = 0;
 function row(overrides: Record<string, unknown> = {}) {
   return {
     id: "t1",
@@ -16,8 +17,10 @@ function row(overrides: Record<string, unknown> = {}) {
     context_tags: [],
     waiting_on: null,
     recurrence_rule: null,
-    project_id: null,
+    outcome: null,
     parent_task_id: null,
+    sort_order: 0,
+    created_at: `2026-07-01T00:00:00.${String(seq++).padStart(3, "0")}Z`,
     notes: null,
     ...overrides,
   };
@@ -34,17 +37,24 @@ describe("buildUpdatePatch", () => {
     expect(patch).toEqual({ title: "New", urgency: 4 });
   });
 
-  it("clears dates on empty string, passes them through otherwise", () => {
+  it("clears dates and parent on empty string, passes them through otherwise", () => {
     expect(buildUpdatePatch({ due_at: "" })).toEqual({ due_at: null });
     expect(buildUpdatePatch({ due_at: "2026-07-08T15:00:00Z" })).toEqual({
       due_at: "2026-07-08T15:00:00Z",
+    });
+    expect(buildUpdatePatch({ parent_task_id: "" })).toEqual({ parent_task_id: null });
+    expect(buildUpdatePatch({ parent_task_id: "p1" })).toEqual({
+      parent_task_id: "p1",
+    });
+    expect(buildUpdatePatch({ outcome: "Done means done" })).toEqual({
+      outcome: "Done means done",
     });
     expect(buildUpdatePatch({})).toEqual({});
   });
 });
 
 describe("filterAndRankTasks", () => {
-  it("drops sub-tasks and ranks by priority", () => {
+  it("drops sub-tasks from the top-level view and ranks by priority", () => {
     const rows = [
       row({ id: "low", urgency: 1, importance: 1 }),
       row({ id: "sub", parent_task_id: "low" }),
@@ -53,6 +63,31 @@ describe("filterAndRankTasks", () => {
     const out = filterAndRankTasks(rows, {}, now);
     expect(out.map((t) => t.id)).toEqual(["high", "low"]);
     expect(out[0].quadrant).toBe("do");
+  });
+
+  it("lists a task's subtasks when parent_task_id is given", () => {
+    const rows = [
+      row({ id: "p" }),
+      row({ id: "a", parent_task_id: "p" }),
+      row({ id: "b", parent_task_id: "other" }),
+    ];
+    const out = filterAndRankTasks(rows, { parent_task_id: "p" }, now);
+    expect(out.map((t) => t.id)).toEqual(["a"]);
+  });
+
+  it("flags has_subtasks and stalled parents", () => {
+    const rows = [
+      row({ id: "moving" }),
+      row({ id: "m1", parent_task_id: "moving", status: "next" }),
+      row({ id: "stuck" }),
+      row({ id: "s1", parent_task_id: "stuck", status: "waiting" }),
+      row({ id: "plain" }),
+    ];
+    const out = filterAndRankTasks(rows, {}, now);
+    const byId = new Map(out.map((t) => [t.id, t]));
+    expect(byId.get("moving")).toMatchObject({ has_subtasks: true, stalled: false });
+    expect(byId.get("stuck")).toMatchObject({ has_subtasks: true, stalled: true });
+    expect(byId.get("plain")).toMatchObject({ has_subtasks: false, stalled: false });
   });
 
   it("applies due_within_days including overdue", () => {

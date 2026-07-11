@@ -1,14 +1,14 @@
 "use client";
 
 import type { Review } from "@gtd/shared";
-import { byPriority } from "@gtd/shared";
+import { byPriority, hasOpenSubtasks, isStalledParent } from "@gtd/shared";
 import clsx from "clsx";
 import { ArrowLeft, Check, PartyPopper } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { TaskList } from "@/components/task-list";
 import { Button, Textarea } from "@/components/ui";
-import { useProjects, useReviews, useSaveReview, useTasks } from "@/lib/data";
+import { useReviews, useSaveReview, useTasks } from "@/lib/data";
 import { addDays, startOfDay, weekPeriod } from "@/lib/format";
 import { useSpace } from "@/lib/space-context";
 
@@ -24,7 +24,6 @@ const STEPS = [
 export default function WeeklyReviewPage() {
   const { currentSpace } = useSpace();
   const { data: tasks = [] } = useTasks(currentSpace?.id);
-  const { data: projects = [] } = useProjects(currentSpace?.id);
   const { data: reviews = [] } = useReviews("weekly");
   const saveReview = useSaveReview();
 
@@ -58,12 +57,11 @@ export default function WeeklyReviewPage() {
         .sort(
           (a, b) => new Date(a.due_at!).getTime() - new Date(b.due_at!).getTime()
         ),
-      stalledProjects: projects.filter(
-        (p) =>
-          p.status === "active" &&
-          !open.some((t) => t.project_id === p.id && t.status === "next")
+      // "Projects" = top-level tasks with open subtasks.
+      stalledParents: open.filter((t) => isStalledParent(t, tasks, now)),
+      activeParents: open.filter(
+        (t) => t.status !== "someday" && hasOpenSubtasks(t.id, tasks)
       ),
-      activeProjects: projects.filter((p) => p.status === "active"),
       waiting: open.filter((t) => t.status === "waiting"),
       someday: open.filter((t) => t.status === "someday"),
       top: open
@@ -72,7 +70,7 @@ export default function WeeklyReviewPage() {
         .slice(0, 7),
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, projects]);
+  }, [tasks]);
 
   async function persist(patch: Partial<Review>) {
     await saveReview.mutateAsync({
@@ -193,29 +191,19 @@ export default function WeeklyReviewPage() {
 
         {current.key === "projects" && (
           <div className="mt-3">
-            {data.stalledProjects.length > 0 ? (
+            {data.stalledParents.length > 0 ? (
               <>
                 <p className="mb-3 text-sm text-amber-700">
-                  {data.stalledProjects.length} of {data.activeProjects.length}{" "}
-                  active projects have no next action:
+                  {data.stalledParents.length} of {data.activeParents.length}{" "}
+                  projects (tasks with subtasks) have no next action — open
+                  each and decide the next step:
                 </p>
-                <ul className="flex flex-col gap-1.5">
-                  {data.stalledProjects.map((p) => (
-                    <li key={p.id}>
-                      <Link
-                        href={`/projects/${p.id}`}
-                        className="text-sm font-medium text-accent hover:underline"
-                      >
-                        {p.name} →
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                <TaskList tasks={data.stalledParents} />
               </>
             ) : (
               <p className="mt-1 flex items-center gap-1.5 text-sm text-emerald-600">
-                <Check size={15} /> All {data.activeProjects.length} active
-                projects have a next action.
+                <Check size={15} /> All {data.activeParents.length} projects
+                have a next action.
               </p>
             )}
           </div>

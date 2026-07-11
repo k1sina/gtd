@@ -33,26 +33,35 @@ import Testing
         #expect(object.keys.contains("assigned_to") == false)
     }
 
-    @Test func projectPatchWritesNullsOnlyWhenClearing() throws {
-        var patch = ProjectPatch()
-        patch.status = .completed
-        patch.completedAt = date("2026-07-07T10:00:00")
-        var data = try PostgrestJSON.encoder.encode(patch)
+    @Test func outcomeRoundTripsThroughExplicitEncoders() throws {
+        // Guards the hand-written encode(to:) bodies: a property added without
+        // its CodingKey would compile but silently never persist.
+        let insert = NewTaskPayload(
+            spaceId: UUID(), createdBy: UUID(), title: "Renovate",
+            outcome: "Kitchen usable again")
+        var data = try PostgrestJSON.encoder.encode(insert)
         var object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(object["status"] as? String == "completed")
-        #expect(object["completed_at"] is String)
-        #expect(object.keys.contains("area_id") == false)
-        #expect(object.keys.contains("name") == false)
+        #expect(object["outcome"] as? String == "Kitchen usable again")
 
-        var reopen = ProjectPatch()
-        reopen.status = .active
-        reopen.clearCompletedAt = true
-        reopen.clearAreaId = true
-        data = try PostgrestJSON.encoder.encode(reopen)
+        var patch = TaskPatch()
+        patch.outcome = "Kitchen usable again"
+        data = try PostgrestJSON.encoder.encode(patch)
         object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(object["status"] as? String == "active")
-        #expect(object["completed_at"] is NSNull)
-        #expect(object["area_id"] is NSNull)
+        #expect(object["outcome"] as? String == "Kitchen usable again")
+
+        var clearing = TaskPatch()
+        clearing.clearOutcome = true
+        clearing.clearParentTaskId = true
+        data = try PostgrestJSON.encoder.encode(clearing)
+        object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object["outcome"] is NSNull)
+        #expect(object["parent_task_id"] is NSNull)
+
+        let untouched = TaskPatch()
+        data = try PostgrestJSON.encoder.encode(untouched)
+        object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
+        #expect(object.keys.contains("outcome") == false)
+        #expect(object.keys.contains("parent_task_id") == false)
     }
 
     @Test func reviewPatchEncodesChecklistAndCompletion() throws {

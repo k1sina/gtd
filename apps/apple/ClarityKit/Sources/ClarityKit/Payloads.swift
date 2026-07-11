@@ -8,8 +8,8 @@ public struct NewTaskPayload: Encodable, Sendable {
     public var createdBy: UUID
     public var title: String
     public var notes: String?
+    public var outcome: String?
     public var status: TaskStatus
-    public var projectId: UUID?
     public var parentTaskId: UUID?
     public var assignedTo: UUID?
     public var urgency: Int
@@ -31,8 +31,8 @@ public struct NewTaskPayload: Encodable, Sendable {
         createdBy: UUID,
         title: String,
         notes: String? = nil,
+        outcome: String? = nil,
         status: TaskStatus = .inbox,
-        projectId: UUID? = nil,
         parentTaskId: UUID? = nil,
         assignedTo: UUID? = nil,
         urgency: Int = 2,
@@ -53,8 +53,8 @@ public struct NewTaskPayload: Encodable, Sendable {
         self.createdBy = createdBy
         self.title = title
         self.notes = notes
+        self.outcome = outcome
         self.status = status
-        self.projectId = projectId
         self.parentTaskId = parentTaskId
         self.assignedTo = assignedTo
         self.urgency = urgency
@@ -73,7 +73,7 @@ public struct NewTaskPayload: Encodable, Sendable {
     }
 
     enum CodingKeys: String, CodingKey {
-        case spaceId, createdBy, title, notes, status, projectId, parentTaskId
+        case spaceId, createdBy, title, notes, outcome, status, parentTaskId
         case assignedTo, urgency, importance, dueAt, deferUntil, estimatedMinutes
         case energy, contextTags, waitingOn, recurrenceRule, recurrenceParentId
         case sortOrder, completedAt, externalRef
@@ -89,8 +89,8 @@ public struct NewTaskPayload: Encodable, Sendable {
         try c.encode(createdBy, forKey: .createdBy)
         try c.encode(title, forKey: .title)
         try c.encode(notes, forKey: .notes)
+        try c.encode(outcome, forKey: .outcome)
         try c.encode(status, forKey: .status)
-        try c.encode(projectId, forKey: .projectId)
         try c.encode(parentTaskId, forKey: .parentTaskId)
         try c.encode(assignedTo, forKey: .assignedTo)
         try c.encode(urgency, forKey: .urgency)
@@ -108,25 +108,29 @@ public struct NewTaskPayload: Encodable, Sendable {
         try c.encode(externalRef, forKey: .externalRef)
     }
 
-    /// Map a quick-add parse onto an insert payload, resolving the `#Project`
-    /// hint against the given project list (exact match first, then prefix).
+    /// Map a quick-add parse onto an insert payload, resolving the `#Parent`
+    /// hint against the given candidate tasks — open, top-level titles (exact
+    /// match first, then prefix). A hit files the new task as a subtask.
     public init(
         parsed: ParsedQuickAdd,
         spaceId: UUID,
         createdBy: UUID,
-        projects: [Project] = []
+        parentCandidates: [TaskItem] = []
     ) {
-        var projectId: UUID?
-        if let hint = parsed.projectHint?.lowercased() {
-            projectId = (projects.first { $0.name.lowercased() == hint }
-                ?? projects.first { $0.name.lowercased().hasPrefix(hint) })?.id
+        var parentTaskId: UUID?
+        if let hint = parsed.parentHint?.lowercased() {
+            let candidates = parentCandidates.filter {
+                $0.parentTaskId == nil && $0.status != .done && $0.status != .cancelled
+            }
+            parentTaskId = (candidates.first { $0.title.lowercased() == hint }
+                ?? candidates.first { $0.title.lowercased().hasPrefix(hint) })?.id
         }
         self.init(
             spaceId: spaceId,
             createdBy: createdBy,
             title: parsed.title.isEmpty ? "Untitled" : parsed.title,
             status: parsed.someday ? .someday : .inbox,
-            projectId: projectId,
+            parentTaskId: parentTaskId,
             urgency: parsed.urgency ?? 2,
             importance: parsed.importance ?? 2,
             dueAt: parsed.dueAt,
@@ -142,8 +146,9 @@ public struct NewTaskPayload: Encodable, Sendable {
 public struct TaskPatch: Encodable, Sendable {
     public var title: String?
     public var notes: String?
+    public var outcome: String?
     public var status: TaskStatus?
-    public var projectId: UUID?
+    public var parentTaskId: UUID?
     public var assignedTo: UUID?
     public var urgency: Int?
     public var importance: Int?
@@ -161,7 +166,8 @@ public struct TaskPatch: Encodable, Sendable {
     public var clearDeferUntil = false
     public var clearRecurrenceRule = false
     public var clearCompletedAt = false
-    public var clearProjectId = false
+    public var clearParentTaskId = false
+    public var clearOutcome = false
     public var clearEstimatedMinutes = false
     public var clearEnergy = false
     public var clearWaitingOn = false
@@ -170,9 +176,9 @@ public struct TaskPatch: Encodable, Sendable {
     public init() {}
 
     private enum CodingKeys: String, CodingKey {
-        case title, notes, status, projectId, assignedTo, urgency, importance,
-            dueAt, deferUntil, estimatedMinutes, energy, contextTags, waitingOn,
-            recurrenceRule, sortOrder, completedAt
+        case title, notes, outcome, status, parentTaskId, assignedTo, urgency,
+            importance, dueAt, deferUntil, estimatedMinutes, energy, contextTags,
+            waitingOn, recurrenceRule, sortOrder, completedAt
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -185,8 +191,10 @@ public struct TaskPatch: Encodable, Sendable {
         try c.encodeIfPresent(contextTags, forKey: .contextTags)
         try c.encodeIfPresent(sortOrder, forKey: .sortOrder)
 
-        if clearProjectId { try c.encodeNil(forKey: .projectId) }
-        else { try c.encodeIfPresent(projectId, forKey: .projectId) }
+        if clearOutcome { try c.encodeNil(forKey: .outcome) }
+        else { try c.encodeIfPresent(outcome, forKey: .outcome) }
+        if clearParentTaskId { try c.encodeNil(forKey: .parentTaskId) }
+        else { try c.encodeIfPresent(parentTaskId, forKey: .parentTaskId) }
         if clearAssignedTo { try c.encodeNil(forKey: .assignedTo) }
         else { try c.encodeIfPresent(assignedTo, forKey: .assignedTo) }
         if clearDueAt { try c.encodeNil(forKey: .dueAt) }
@@ -201,47 +209,6 @@ public struct TaskPatch: Encodable, Sendable {
         else { try c.encodeIfPresent(waitingOn, forKey: .waitingOn) }
         if clearRecurrenceRule { try c.encodeNil(forKey: .recurrenceRule) }
         else { try c.encodeIfPresent(recurrenceRule, forKey: .recurrenceRule) }
-        if clearCompletedAt { try c.encodeNil(forKey: .completedAt) }
-        else { try c.encodeIfPresent(completedAt, forKey: .completedAt) }
-    }
-}
-
-/// Update payload for a project row. Same convention as TaskPatch: nil =
-/// leave the column alone; `clear*` flags write explicit SQL nulls.
-public struct ProjectPatch: Encodable, Sendable {
-    public var name: String?
-    public var outcome: String?
-    public var status: ProjectStatus?
-    public var areaId: UUID?
-    public var goalId: UUID?
-    public var sortOrder: Double?
-    public var reviewedAt: Date?
-    public var completedAt: Date?
-
-    public var clearAreaId = false
-    public var clearGoalId = false
-    public var clearCompletedAt = false
-    public var clearOutcome = false
-
-    public init() {}
-
-    private enum CodingKeys: String, CodingKey {
-        case name, outcome, status, areaId, goalId, sortOrder, reviewedAt, completedAt
-    }
-
-    public func encode(to encoder: Encoder) throws {
-        var c = encoder.container(keyedBy: CodingKeys.self)
-        try c.encodeIfPresent(name, forKey: .name)
-        try c.encodeIfPresent(status, forKey: .status)
-        try c.encodeIfPresent(sortOrder, forKey: .sortOrder)
-        try c.encodeIfPresent(reviewedAt, forKey: .reviewedAt)
-
-        if clearOutcome { try c.encodeNil(forKey: .outcome) }
-        else { try c.encodeIfPresent(outcome, forKey: .outcome) }
-        if clearAreaId { try c.encodeNil(forKey: .areaId) }
-        else { try c.encodeIfPresent(areaId, forKey: .areaId) }
-        if clearGoalId { try c.encodeNil(forKey: .goalId) }
-        else { try c.encodeIfPresent(goalId, forKey: .goalId) }
         if clearCompletedAt { try c.encodeNil(forKey: .completedAt) }
         else { try c.encodeIfPresent(completedAt, forKey: .completedAt) }
     }

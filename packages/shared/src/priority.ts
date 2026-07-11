@@ -25,6 +25,14 @@ export const QUADRANT_LABELS: Record<Quadrant, string> = {
 export const PRIORITY_STEPS = 4;
 
 /**
+ * (2,2) is the create-time default and doubles as the "unrated" sentinel —
+ * a task still sitting there has never been prioritised deliberately.
+ */
+export function isRatedPriority(urgency: number, importance: number): boolean {
+  return !(urgency === 2 && importance === 2);
+}
+
+/**
  * Map a point on the unit square (y measured DOWN, screen-style) to snapped
  * grid values. Out-of-range fractions clamp, so drags past the edge stick to
  * the border cells. x = urgency, y = importance (importance grows upward).

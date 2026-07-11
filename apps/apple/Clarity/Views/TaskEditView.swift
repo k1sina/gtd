@@ -6,7 +6,6 @@ import SwiftUI
 /// with explicit nulls when toggled off.
 struct TaskEditView: View {
     let task: TaskItem
-    let projects: [Project]
     let onSave: () async -> Void
 
     @Environment(AppSession.self) private var session
@@ -14,10 +13,11 @@ struct TaskEditView: View {
 
     @State private var title: String
     @State private var notes: String
+    @State private var outcome: String
     @State private var status: TaskStatus
-    @State private var projectId: UUID?
     @State private var urgency: Int
     @State private var importance: Int
+    @State private var priorityExpanded: Bool
     @State private var hasDue: Bool
     @State private var dueAt: Date
     @State private var hasDefer: Bool
@@ -43,16 +43,18 @@ struct TaskEditView: View {
         ("Every year", "FREQ=YEARLY;INTERVAL=1"),
     ]
 
-    init(task: TaskItem, projects: [Project], onSave: @escaping () async -> Void) {
+    init(task: TaskItem, onSave: @escaping () async -> Void) {
         self.task = task
-        self.projects = projects
         self.onSave = onSave
         _title = State(initialValue: task.title)
         _notes = State(initialValue: task.notes ?? "")
+        _outcome = State(initialValue: task.outcome ?? "")
         _status = State(initialValue: task.status)
-        _projectId = State(initialValue: task.projectId)
         _urgency = State(initialValue: task.urgency)
         _importance = State(initialValue: task.importance)
+        // Collapsed unless the task was deliberately rated (≠ the 2,2 default).
+        _priorityExpanded = State(
+            initialValue: isRatedPriority(urgency: task.urgency, importance: task.importance))
         _hasDue = State(initialValue: task.dueAt != nil)
         _dueAt = State(initialValue: task.dueAt ?? .now)
         _hasDefer = State(initialValue: task.deferUntil != nil)
@@ -79,12 +81,6 @@ struct TaskEditView: View {
                             Text(status.rawValue.capitalized).tag(status)
                         }
                     }
-                    Picker("Project", selection: $projectId) {
-                        Text("None").tag(UUID?.none)
-                        ForEach(projects) { project in
-                            Text(project.name).tag(UUID?.some(project.id))
-                        }
-                    }
                     if status == .waiting {
                         TextField("Waiting on", text: $waitingOn)
                     }
@@ -99,15 +95,23 @@ struct TaskEditView: View {
                         }
                     }
                 }
-                Section("Priority") {
-                    PriorityMatrixView(urgency: $urgency, importance: $importance)
-                        .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
-                    LabeledContent("Quadrant") {
-                        Label(
-                            quadrant(urgency: urgency, importance: importance).label,
-                            systemImage: "circle.fill"
-                        )
-                        .foregroundStyle(quadrant(urgency: urgency, importance: importance).color)
+                Section {
+                    DisclosureGroup(isExpanded: $priorityExpanded) {
+                        PriorityMatrixView(urgency: $urgency, importance: $importance)
+                            .listRowInsets(EdgeInsets(top: 8, leading: 8, bottom: 8, trailing: 8))
+                    } label: {
+                        LabeledContent("Priority") {
+                            if isRatedPriority(urgency: urgency, importance: importance) {
+                                Label(
+                                    quadrant(urgency: urgency, importance: importance).label,
+                                    systemImage: "circle.fill"
+                                )
+                                .foregroundStyle(
+                                    quadrant(urgency: urgency, importance: importance).color)
+                            } else {
+                                Text("Not rated")
+                            }
+                        }
                     }
                 }
                 Section("Schedule") {
@@ -141,9 +145,7 @@ struct TaskEditView: View {
                     }
                     TextField("Tags (comma separated)", text: $tagsText)
                 }
-                if task.parentTaskId == nil {
-                    subtasksSection
-                }
+                subtasksSection
                 CommentsSection(task: task)
                 if let error {
                     Section { Text(error).foregroundStyle(.red).font(.footnote) }
@@ -176,9 +178,13 @@ struct TaskEditView: View {
     }
 
     /// Checklist-style sub-tasks — mirrors the subtasks block in the web
-    /// task detail dialog.
+    /// task detail dialog. Any task can hold them (a task with subtasks IS a
+    /// project), so the section also carries the GTD outcome line.
     private var subtasksSection: some View {
         Section("Subtasks") {
+            if !subtasks.isEmpty || !outcome.isEmpty {
+                TextField("Outcome — what does done look like?", text: $outcome)
+            }
             ForEach(subtasks) { subtask in
                 HStack(spacing: 10) {
                     Button {
@@ -209,8 +215,7 @@ struct TaskEditView: View {
     }
 
     private func loadSubtasks() async {
-        guard task.parentTaskId == nil,
-              let ctx = try? session.requireContext() else { return }
+        guard let ctx = try? session.requireContext() else { return }
         subtasks = (try? await TaskRepository(ctx).subtasks(of: task.id)) ?? []
     }
 
@@ -222,7 +227,7 @@ struct TaskEditView: View {
             let ctx = try session.requireContext()
             _ = try await TaskRepository(ctx).create(NewTaskPayload(
                 spaceId: ctx.spaceId, createdBy: ctx.userId, title: text,
-                status: .next, projectId: task.projectId, parentTaskId: task.id))
+                status: .next, parentTaskId: task.id))
             await loadSubtasks()
         } catch {
             self.error = error.localizedDescription
@@ -245,8 +250,11 @@ struct TaskEditView: View {
         var patch = TaskPatch()
         patch.title = title.trimmingCharacters(in: .whitespaces)
         patch.notes = notes
+        let trimmedOutcome = outcome.trimmingCharacters(in: .whitespaces)
+        if trimmedOutcome.isEmpty { patch.clearOutcome = true } else {
+            patch.outcome = trimmedOutcome
+        }
         patch.status = status
-        if let projectId { patch.projectId = projectId } else { patch.clearProjectId = true }
         patch.urgency = urgency
         patch.importance = importance
         if hasDue { patch.dueAt = dueAt } else { patch.clearDueAt = true }

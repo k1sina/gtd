@@ -15,12 +15,13 @@ public enum Energy: String, Codable, CaseIterable, Sendable {
 public struct TaskItem: Codable, Identifiable, Hashable, Sendable, Prioritizable {
     public var id: UUID
     public var spaceId: UUID
-    public var projectId: UUID?
     public var parentTaskId: UUID?
     public var createdBy: UUID
     public var assignedTo: UUID?
     public var title: String
     public var notes: String?
+    /// GTD: what does "done" look like? Meaningful on parents of subtasks.
+    public var outcome: String?
     public var status: TaskStatus
     public var urgency: Int
     public var importance: Int
@@ -43,8 +44,9 @@ public struct TaskItem: Codable, Identifiable, Hashable, Sendable, Prioritizable
     }
 
     public init(
-        id: UUID, spaceId: UUID, projectId: UUID? = nil, parentTaskId: UUID? = nil,
+        id: UUID, spaceId: UUID, parentTaskId: UUID? = nil,
         createdBy: UUID, assignedTo: UUID? = nil, title: String, notes: String? = nil,
+        outcome: String? = nil,
         status: TaskStatus = .inbox, urgency: Int = 2, importance: Int = 2,
         dueAt: Date? = nil, deferUntil: Date? = nil, estimatedMinutes: Int? = nil,
         energy: Energy? = nil, contextTags: [String] = [], waitingOn: String? = nil,
@@ -54,12 +56,12 @@ public struct TaskItem: Codable, Identifiable, Hashable, Sendable, Prioritizable
     ) {
         self.id = id
         self.spaceId = spaceId
-        self.projectId = projectId
         self.parentTaskId = parentTaskId
         self.createdBy = createdBy
         self.assignedTo = assignedTo
         self.title = title
         self.notes = notes
+        self.outcome = outcome
         self.status = status
         self.urgency = urgency
         self.importance = importance
@@ -76,75 +78,6 @@ public struct TaskItem: Codable, Identifiable, Hashable, Sendable, Prioritizable
         self.externalRef = externalRef
         self.createdAt = createdAt
         self.updatedAt = updatedAt
-    }
-}
-
-public enum ProjectStatus: String, Codable, CaseIterable, Sendable {
-    case active, someday, completed, archived
-    case onHold = "on_hold"
-
-    public var label: String {
-        switch self {
-        case .active: return "Active"
-        case .someday: return "Someday"
-        case .onHold: return "On hold"
-        case .completed: return "Completed"
-        case .archived: return "Archived"
-        }
-    }
-}
-
-public struct Project: Codable, Identifiable, Hashable, Sendable {
-    public var id: UUID
-    public var spaceId: UUID
-    public var areaId: UUID?
-    public var goalId: UUID?
-    public var name: String
-    public var outcome: String?
-    public var status: ProjectStatus
-    public var sortOrder: Double
-    public var reviewedAt: Date?
-    public var createdAt: Date
-    public var completedAt: Date?
-
-    public init(
-        id: UUID, spaceId: UUID, areaId: UUID? = nil, goalId: UUID? = nil,
-        name: String, outcome: String? = nil, status: ProjectStatus = .active,
-        sortOrder: Double = 0, reviewedAt: Date? = nil,
-        createdAt: Date = Date(), completedAt: Date? = nil
-    ) {
-        self.id = id
-        self.spaceId = spaceId
-        self.areaId = areaId
-        self.goalId = goalId
-        self.name = name
-        self.outcome = outcome
-        self.status = status
-        self.sortOrder = sortOrder
-        self.reviewedAt = reviewedAt
-        self.createdAt = createdAt
-        self.completedAt = completedAt
-    }
-}
-
-public struct Area: Codable, Identifiable, Hashable, Sendable {
-    public var id: UUID
-    public var spaceId: UUID
-    public var name: String
-    public var color: String?
-    public var sortOrder: Double
-    public var createdAt: Date
-
-    public init(
-        id: UUID, spaceId: UUID, name: String, color: String? = nil,
-        sortOrder: Double = 0, createdAt: Date = Date()
-    ) {
-        self.id = id
-        self.spaceId = spaceId
-        self.name = name
-        self.color = color
-        self.sortOrder = sortOrder
-        self.createdAt = createdAt
     }
 }
 

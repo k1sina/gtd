@@ -1,14 +1,13 @@
 "use client";
 
 import type { Task, TaskStatus } from "@gtd/shared";
-import { formatRule, parseRule } from "@gtd/shared";
+import { formatRule, isRatedPriority, parseRule, QUADRANT_LABELS, quadrant } from "@gtd/shared";
 import { Plus, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   useAddTaskComment,
   useCreateTask,
   useDeleteTask,
-  useProjects,
   useSpaceMembers,
   useTaskComments,
   useTasks,
@@ -53,7 +52,6 @@ export function TaskDetail({
 }) {
   const { currentSpace } = useSpace();
   const { data: allTasks = [] } = useTasks(currentSpace?.id);
-  const { data: projects = [] } = useProjects(currentSpace?.id);
   const { data: members = [] } = useSpaceMembers(currentSpace?.id);
   const { data: comments = [] } = useTaskComments(task.id);
   const updateTask = useUpdateTask();
@@ -63,7 +61,10 @@ export function TaskDetail({
 
   const [title, setTitle] = useState(task.title);
   const [notes, setNotes] = useState(task.notes ?? "");
+  const [outcome, setOutcome] = useState(task.outcome ?? "");
   const [newSubtask, setNewSubtask] = useState("");
+  // Drill into a subtask (subtasks can hold subtasks of their own).
+  const [drill, setDrill] = useState<Task | null>(null);
   const [newComment, setNewComment] = useState("");
   const isShared = !currentSpace?.is_personal && members.length > 0;
 
@@ -93,7 +94,6 @@ export function TaskDetail({
       title: newSubtask.trim(),
       status: "next",
       parent_task_id: live.id,
-      project_id: live.project_id,
       sort_order: subtasks.length,
     });
     setNewSubtask("");
@@ -118,6 +118,22 @@ export function TaskDetail({
           rows={3}
           className="mt-3"
         />
+
+        {/* GTD: a task with subtasks is a project — give it an outcome. */}
+        {(subtasks.length > 0 || live.outcome) && (
+          <label className="mt-3 flex flex-col gap-1 text-xs text-ink-soft">
+            Outcome — what does done look like?
+            <Input
+              value={outcome}
+              onChange={(e) => setOutcome(e.target.value)}
+              onBlur={() =>
+                (outcome.trim() || null) !== live.outcome &&
+                patch({ outcome: outcome.trim() || null })
+              }
+              placeholder="e.g. Kitchen fully usable again"
+            />
+          </label>
+        )}
 
         <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4">
           <label className="flex flex-col gap-1 text-xs text-ink-soft">
@@ -158,23 +174,6 @@ export function TaskDetail({
               </Select>
             </label>
           )}
-
-          <label className="flex flex-col gap-1 text-xs text-ink-soft">
-            Project
-            <Select
-              value={live.project_id ?? ""}
-              onChange={(e) => patch({ project_id: e.target.value || null })}
-            >
-              <option value="">No project</option>
-              {projects
-                .filter((p) => p.status === "active" || p.id === live.project_id)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-            </Select>
-          </label>
 
           {live.status === "waiting" && (
             <label className="col-span-2 flex flex-col gap-1 text-xs text-ink-soft">
@@ -308,13 +307,27 @@ export function TaskDetail({
           </label>
         </div>
 
-        <div className="mt-5 rounded-lg border border-line bg-canvas/50 p-3">
-          <PriorityMatrix
-            urgency={live.urgency}
-            importance={live.importance}
-            onChange={(p) => patch(p)}
-          />
-        </div>
+        {/* Collapsed by default; a deliberate rating (≠ the 2,2 default) opens it. */}
+        <details
+          open={isRatedPriority(live.urgency, live.importance)}
+          className="mt-5 rounded-lg border border-line bg-canvas/50"
+        >
+          <summary className="cursor-pointer select-none px-3 py-2 text-xs font-medium text-ink-soft">
+            Priority
+            {isRatedPriority(live.urgency, live.importance) && (
+              <span className="ml-2 text-ink-faint">
+                {QUADRANT_LABELS[quadrant(live.urgency, live.importance)]}
+              </span>
+            )}
+          </summary>
+          <div className="px-3 pb-3">
+            <PriorityMatrix
+              urgency={live.urgency}
+              importance={live.importance}
+              onChange={(p) => patch(p)}
+            />
+          </div>
+        </details>
 
         {/* Comments (shared spaces) */}
         {isShared && (
@@ -359,29 +372,27 @@ export function TaskDetail({
           </div>
         )}
 
-        {/* Subtasks */}
-        {!live.parent_task_id && (
-          <div className="mt-5">
-            <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-faint">
-              Subtasks
-            </h3>
-            <div className="flex flex-col">
-              {subtasks.map((st) => (
-                <TaskRow key={st.id} task={st} showProject={false} />
-              ))}
-            </div>
-            <div className="mt-1 flex items-center gap-2">
-              <Plus size={14} className="text-ink-faint" />
-              <input
-                value={newSubtask}
-                onChange={(e) => setNewSubtask(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && addSubtask()}
-                placeholder="Add subtask and press Enter"
-                className="h-8 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-faint"
-              />
-            </div>
+        {/* Subtasks — any task can hold them (a task with subtasks IS a project) */}
+        <div className="mt-5">
+          <h3 className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-faint">
+            Subtasks
+          </h3>
+          <div className="flex flex-col">
+            {subtasks.map((st) => (
+              <TaskRow key={st.id} task={st} onOpen={setDrill} />
+            ))}
           </div>
-        )}
+          <div className="mt-1 flex items-center gap-2">
+            <Plus size={14} className="text-ink-faint" />
+            <input
+              value={newSubtask}
+              onChange={(e) => setNewSubtask(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && addSubtask()}
+              placeholder="Add subtask and press Enter"
+              className="h-8 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-faint"
+            />
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center justify-between border-t border-line px-4 py-2.5">
@@ -405,6 +416,10 @@ export function TaskDetail({
           Close
         </Button>
       </div>
+
+      {drill && (
+        <TaskDetail key={drill.id} task={drill} onClose={() => setDrill(null)} />
+      )}
     </Dialog>
   );
 }

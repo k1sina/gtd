@@ -9,8 +9,8 @@ import Testing
             {
               "id": "6f1b2a34-0000-4000-8000-000000000001",
               "space_id": "6f1b2a34-0000-4000-8000-000000000002",
-              "project_id": null,
               "parent_task_id": null,
+              "outcome": null,
               "created_by": "6f1b2a34-0000-4000-8000-000000000003",
               "assigned_to": null,
               "title": "Water plants",

@@ -16,7 +16,7 @@ struct AssistantView: View {
     private static let quickPrompts = [
         "What should I focus on today?",
         "Prioritise my inbox",
-        "Any stalled projects?",
+        "Any stalled tasks?",
         "Plan my day",
     ]
 
@@ -100,7 +100,7 @@ struct AssistantView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Your GTD coach — it can read and change your tasks, projects, and plan.")
+            Text("Your GTD coach — it can read and change your tasks, subtasks, and plan.")
                 .font(.callout)
                 .foregroundStyle(.secondary)
             ForEach(Self.quickPrompts, id: \.self) { prompt in
@@ -156,8 +156,6 @@ struct AssistantView: View {
         case "create_task": return "Created a task"
         case "update_task": return "Updated a task"
         case "complete_task": return "Completed a task"
-        case "list_projects": return "Looked at your projects"
-        case "create_project": return "Created a project"
         case "plan_day": return "Planned your day"
         default: return name
         }

@@ -18,8 +18,6 @@ const EXPECTED_TOOLS = [
   "create_task",
   "update_task",
   "complete_task",
-  "list_projects",
-  "create_project",
   "plan_day",
 ];
 
@@ -92,9 +90,41 @@ if (JSON.parse(textOf(updated)).updated?.urgency !== 4) {
 }
 console.log("Tier 2: update_task applied");
 
-const projects = await client.callTool({ name: "list_projects", arguments: {} });
-if (projects.isError) fail(`list_projects errored: ${textOf(projects)}`);
-console.log("Tier 2: list_projects OK");
+// A task with subtasks is a project — exercise the parent/subtask surface.
+const sub = await client.callTool({
+  name: "create_task",
+  arguments: { title: `${marker} subtask`, status: "next", parent_task_id: taskId },
+});
+if (sub.isError) fail(`create_task (subtask) errored: ${textOf(sub)}`);
+const subId: string =
+  JSON.parse(textOf(sub)).created?.id ?? fail("subtask create returned no id");
+console.log(`Tier 2: created subtask ${subId}`);
+
+const relisted = await client.callTool({
+  name: "list_tasks",
+  arguments: { status: "next" },
+});
+if (relisted.isError) fail(`list_tasks errored: ${textOf(relisted)}`);
+const parentRow = (JSON.parse(textOf(relisted)) as Array<Record<string, unknown>>).find(
+  (t) => t.id === taskId
+);
+if (!parentRow?.has_subtasks) fail("parent task not flagged has_subtasks");
+if (parentRow.stalled) fail("parent with a next subtask must not be stalled");
+console.log("Tier 2: has_subtasks/stalled OK");
+
+const subs = await client.callTool({
+  name: "list_tasks",
+  arguments: { parent_task_id: taskId },
+});
+if (subs.isError) fail(`list_tasks (subtasks) errored: ${textOf(subs)}`);
+if (!textOf(subs).includes(subId)) fail("subtask missing from parent_task_id listing");
+console.log("Tier 2: subtask listing OK");
+
+const subDone = await client.callTool({
+  name: "complete_task",
+  arguments: { task_id: subId },
+});
+if (subDone.isError) fail(`complete_task (subtask) errored: ${textOf(subDone)}`);
 
 const completed = await client.callTool({
   name: "complete_task",
@@ -104,7 +134,7 @@ if (completed.isError) fail(`complete_task errored: ${textOf(completed)}`);
 if (JSON.parse(textOf(completed)).completed !== marker) {
   fail("complete_task returned unexpected payload");
 }
-console.log("Tier 2: complete_task OK (task ends in done — self-cleaning)");
+console.log("Tier 2: complete_task OK (tasks end in done — self-cleaning)");
 
 console.log("SMOKE PASS");
 await client.close();
