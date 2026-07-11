@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { byPriority, isDeferred, priorityScore, quadrant } from "../src/priority";
+import {
+  byPriority,
+  fractionFromGridValue,
+  gridValueFromFraction,
+  isDeferred,
+  priorityScore,
+  quadrant,
+} from "../src/priority";
 
 describe("quadrant", () => {
   it("maps the four Eisenhower quadrants", () => {
@@ -14,6 +21,44 @@ describe("quadrant", () => {
     expect(quadrant(2, 3)).toBe("schedule");
     expect(quadrant(3, 2)).toBe("delegate");
     expect(quadrant(2, 2)).toBe("eliminate");
+  });
+});
+
+describe("priority grid", () => {
+  it("maps corners to the extreme cells", () => {
+    expect(gridValueFromFraction(0, 0)).toEqual({ urgency: 1, importance: 4 });
+    expect(gridValueFromFraction(0.999, 0)).toEqual({ urgency: 4, importance: 4 });
+    expect(gridValueFromFraction(0, 0.999)).toEqual({ urgency: 1, importance: 1 });
+    expect(gridValueFromFraction(0.999, 0.999)).toEqual({ urgency: 4, importance: 1 });
+  });
+
+  it("lands dead-center clicks in the Do quadrant", () => {
+    expect(gridValueFromFraction(0.5, 0.5)).toEqual({ urgency: 3, importance: 3 });
+  });
+
+  it("puts boundary fractions into the upper cell", () => {
+    expect(gridValueFromFraction(0.25, 0.5).urgency).toBe(2);
+    expect(gridValueFromFraction(0.5, 0.5).urgency).toBe(3);
+    expect(gridValueFromFraction(0.75, 0.5).urgency).toBe(4);
+  });
+
+  it("clamps out-of-range fractions to the border cells", () => {
+    expect(gridValueFromFraction(-1, 2)).toEqual({ urgency: 1, importance: 1 });
+    expect(gridValueFromFraction(2, -1)).toEqual({ urgency: 4, importance: 4 });
+    expect(gridValueFromFraction(1, 1)).toEqual({ urgency: 4, importance: 1 });
+  });
+
+  it("roundtrips every grid value through its cell center", () => {
+    for (let u = 1; u <= 4; u++) {
+      for (let i = 1; i <= 4; i++) {
+        const { fx, fy } = fractionFromGridValue(u, i);
+        expect(fx).toBeGreaterThanOrEqual(0);
+        expect(fx).toBeLessThanOrEqual(1);
+        expect(fy).toBeGreaterThanOrEqual(0);
+        expect(fy).toBeLessThanOrEqual(1);
+        expect(gridValueFromFraction(fx, fy)).toEqual({ urgency: u, importance: i });
+      }
+    }
   });
 });
 

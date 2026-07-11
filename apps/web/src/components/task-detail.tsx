@@ -15,7 +15,7 @@ import {
   useUpdateTask,
 } from "@/lib/data";
 import { useSpace } from "@/lib/space-context";
-import { PriorityPicker } from "./priority-picker";
+import { PriorityMatrix } from "./priority-matrix";
 import { TaskRow } from "./task-row";
 import { Button, Dialog, Input, Select, Textarea } from "./ui";
 
@@ -309,7 +309,7 @@ export function TaskDetail({
         </div>
 
         <div className="mt-5 rounded-lg border border-line bg-canvas/50 p-3">
-          <PriorityPicker
+          <PriorityMatrix
             urgency={live.urgency}
             importance={live.importance}
             onChange={(p) => patch(p)}

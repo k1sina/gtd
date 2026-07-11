@@ -29,12 +29,13 @@ public enum Quadrant: String, Codable, Sendable {
 
     /// Urgency/importance written to a task dropped into this quadrant on the
     /// priority matrix. Mirrors QUADRANT_VALUES in the web matrix page.
+    /// Eliminate is (1, 1) — never (2, 2), which is the "unrated" sentinel.
     public var representativeValues: (urgency: Int, importance: Int) {
         switch self {
         case .doFirst: return (4, 4)
         case .schedule: return (2, 4)
         case .delegate: return (4, 2)
-        case .eliminate: return (2, 2)
+        case .eliminate: return (1, 1)
         }
     }
 }
@@ -50,6 +51,29 @@ public func quadrant(urgency: Int, importance: Int) -> Quadrant {
     case (true, false): return .delegate
     case (false, false): return .eliminate
     }
+}
+
+/// Steps per axis on the priority grid (values are 1...prioritySteps).
+public let prioritySteps = 4
+
+/// Map a point on the unit square (y measured DOWN, screen-style) to snapped
+/// grid values. Out-of-range fractions clamp, so drags past the edge stick to
+/// the border cells. x = urgency, y = importance (importance grows upward).
+public func gridValueFromFraction(fx: Double, fy: Double) -> (urgency: Int, importance: Int) {
+    func cell(_ f: Double) -> Int {
+        // Clamp in Double space so extreme inputs can't overflow Int().
+        let index = (f * Double(prioritySteps)).rounded(.down) + 1
+        return Int(min(Double(prioritySteps), max(1, index)))
+    }
+    return (urgency: cell(fx), importance: cell(1 - fy))
+}
+
+/// Unit-square center (y down) of a grid cell, for placing the dot.
+public func fractionFromGridValue(urgency: Int, importance: Int) -> (fx: Double, fy: Double) {
+    (
+        fx: (Double(urgency) - 0.5) / Double(prioritySteps),
+        fy: 1 - (Double(importance) - 0.5) / Double(prioritySteps)
+    )
 }
 
 public protocol Prioritizable {
