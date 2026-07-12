@@ -10,6 +10,7 @@ import {
   Hourglass,
   RefreshCcw,
   Tag,
+  Zap,
 } from "lucide-react";
 import { useCompleteTask, useUndoComplete } from "@/lib/data";
 import { formatDue, formatMinutes } from "@/lib/format";
@@ -32,6 +33,13 @@ const QUADRANT_DOT: Record<string, string> = {
   delegate: "bg-q-delegate",
   eliminate: "bg-q-eliminate",
 };
+
+/** Low = easy wins (green) … high = demands focus (red). */
+const ENERGY_TONE = {
+  low: "green",
+  medium: "amber",
+  high: "red",
+} as const;
 
 export function TaskRow({
   task,
@@ -136,6 +144,7 @@ export function TaskRow({
           task.recurrence_rule ||
           task.estimated_minutes ||
           task.waiting_on ||
+          actionTask.energy ||
           subtaskStats) && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {stalled && (
@@ -179,6 +188,12 @@ export function TaskRow({
               <Badge tone="neutral">
                 <AlarmClock size={10} />
                 {formatMinutes(task.estimated_minutes)}
+              </Badge>
+            )}
+            {actionTask.energy && (
+              <Badge tone={ENERGY_TONE[actionTask.energy]}>
+                <Zap size={10} />
+                {actionTask.energy}
               </Badge>
             )}
             {task.context_tags.map((t) => (

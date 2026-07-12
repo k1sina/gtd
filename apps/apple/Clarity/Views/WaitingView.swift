@@ -11,18 +11,44 @@ struct WaitingView: View {
     @State private var editing: TaskItem?
     @State private var loading = true
     @State private var error: String?
+    @State private var tagFilter: String?
+    @State private var energyFilter: Energy?
+
+    // Contexts double as agendas here (@sara, @boss — GTD's per-person lists).
+    private var allTags: [String] {
+        Array(Set(tasks.flatMap(\.contextTags))).sorted()
+    }
+
+    private var filtered: [TaskItem] {
+        tasks.filter { task in
+            (tagFilter == nil || task.contextTags.contains(tagFilter!))
+                && (energyFilter == nil || task.energy == energyFilter)
+        }
+    }
 
     var body: some View {
         List {
             if let error {
                 Section { Text(error).foregroundStyle(.red).font(.footnote) }
             }
+            if !allTags.isEmpty || tasks.contains(where: { $0.energy != nil }) {
+                Section {
+                    TaskFilterChips(
+                        storageKey: "clarity.filters.waiting",
+                        allTags: allTags,
+                        showEnergy: tasks.contains(where: { $0.energy != nil }),
+                        tagFilter: $tagFilter,
+                        energyFilter: $energyFilter)
+                }
+            }
             Section {
                 if tasks.isEmpty && !loading {
                     Text("Nothing on hold — delegate from the task editor with \"Waiting for…\".")
                         .foregroundStyle(.secondary)
+                } else if filtered.isEmpty && !loading {
+                    Text("Nothing matches the filters.").foregroundStyle(.secondary)
                 }
-                ForEach(tasks) { task in
+                ForEach(filtered) { task in
                     TaskRowView(task: task, subtaskStats: subtaskCounts[task.id]) {
                         Task { await complete(task) }
                     } onTap: {

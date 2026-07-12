@@ -17,7 +17,7 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
   {
     name: "list_tasks",
     description:
-      "List the user's tasks. Call this before answering questions about workload, priorities, overdue items, or what to do next. Returns id, title, status, urgency/importance (1-4), quadrant, due date, tags, estimate. A task with has_subtasks is a project; stalled means it has no actionable next-step subtask. Pass parent_task_id to list a task's subtasks.",
+      "List the user's tasks. Call this before answering questions about workload, priorities, overdue items, or what to do next. Returns id, title, status, urgency/importance (1-4), quadrant, due date, tags, energy, estimate. A task with has_subtasks is a project; stalled means it has no actionable next-step subtask. Pass parent_task_id to list a task's subtasks. Filter by context_tag/energy to answer \"what can I do at home with low energy?\".",
     input_schema: {
       type: "object",
       properties: {
@@ -29,6 +29,15 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
         parent_task_id: {
           type: "string",
           description: "List the subtasks of this task instead of top-level tasks",
+        },
+        context_tag: {
+          type: "string",
+          description: "Only tasks with this context tag (e.g. 'home', 'phone')",
+        },
+        energy: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Only tasks at this energy level",
         },
         due_within_days: {
           type: "number",
@@ -54,6 +63,11 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
         outcome: {
           type: "string",
           description: "For multi-step outcomes: what does 'done' look like?",
+        },
+        energy: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Energy the task demands",
         },
         parent_task_id: {
           type: "string",
@@ -91,6 +105,16 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
         },
         urgency: { type: "number" },
         importance: { type: "number" },
+        energy: {
+          type: "string",
+          enum: ["low", "medium", "high"],
+          description: "Energy the task demands",
+        },
+        context_tags: {
+          type: "array",
+          items: { type: "string" },
+          description: "Replaces the task's context tags",
+        },
         due_at: { type: "string", description: "ISO 8601, or empty string to clear" },
         defer_until: { type: "string" },
         parent_task_id: {
@@ -131,7 +155,7 @@ type ToolInput = Record<string, unknown>;
 async function listTasks(ctx: ToolContext, input: ToolInput) {
   let query = ctx.supabase
     .from("tasks")
-    .select("id, title, status, urgency, importance, due_at, defer_until, estimated_minutes, context_tags, waiting_on, recurrence_rule, outcome, parent_task_id, sort_order, created_at, notes")
+    .select("id, title, status, urgency, importance, due_at, defer_until, estimated_minutes, energy, context_tags, waiting_on, recurrence_rule, outcome, parent_task_id, sort_order, created_at, notes")
     .eq("space_id", ctx.spaceId);
 
   const status = input.status as string | undefined;
@@ -165,6 +189,12 @@ async function listTasks(ctx: ToolContext, input: ToolInput) {
   let tasks = input.parent_task_id
     ? all.filter((t) => t.parent_task_id === input.parent_task_id)
     : all.filter((t) => !t.parent_task_id);
+  if (input.context_tag) {
+    tasks = tasks.filter((t) => t.context_tags.includes(input.context_tag as string));
+  }
+  if (input.energy) {
+    tasks = tasks.filter((t) => t.energy === input.energy);
+  }
   if (input.due_within_days != null) {
     const cutoff = new Date(now.getTime() + Number(input.due_within_days) * 86400000);
     tasks = tasks.filter((t) => t.due_at && new Date(t.due_at) <= cutoff);
@@ -190,6 +220,7 @@ async function listTasks(ctx: ToolContext, input: ToolInput) {
       due_at: t.due_at,
       deferred: isDeferred(t, now),
       estimated_minutes: t.estimated_minutes,
+      energy: t.energy,
       tags: t.context_tags,
       waiting_on: t.waiting_on,
       recurring: t.recurrence_rule,
@@ -215,6 +246,7 @@ async function createTask(ctx: ToolContext, input: ToolInput) {
       due_at: input.due_at || null,
       urgency: input.urgency ?? 2,
       importance: input.importance ?? 2,
+      energy: input.energy ?? null,
       estimated_minutes: input.estimated_minutes ?? null,
       context_tags: input.context_tags ?? [],
       recurrence_rule: input.recurrence_rule ?? null,
@@ -235,6 +267,8 @@ async function updateTask(ctx: ToolContext, input: ToolInput) {
     "status",
     "urgency",
     "importance",
+    "energy",
+    "context_tags",
     "estimated_minutes",
     "waiting_on",
     "sort_order",

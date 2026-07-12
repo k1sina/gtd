@@ -1,9 +1,9 @@
 "use client";
 
-import { byUserOrder, isDeferred, type Energy } from "@gtd/shared";
-import clsx from "clsx";
+import { byUserOrder, isDeferred } from "@gtd/shared";
 import { LayoutList } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
+import { FilterChips, useTaskFilters } from "@/components/filter-chips";
 import { PageHeader, TaskList } from "@/components/task-list";
 import { EmptyState } from "@/components/ui";
 import { useTasks } from "@/lib/data";
@@ -12,8 +12,6 @@ import { useSpace } from "@/lib/space-context";
 export default function NextPage() {
   const { currentSpace } = useSpace();
   const { data: tasks = [] } = useTasks(currentSpace?.id);
-  const [tag, setTag] = useState<string | null>(null);
-  const [energy, setEnergy] = useState<Energy | null>(null);
 
   const now = new Date();
 
@@ -29,15 +27,9 @@ export default function NextPage() {
     [tasks]
   );
 
-  const allTags = useMemo(
-    () => [...new Set(nextTasks.flatMap((t) => t.context_tags))].sort(),
-    [nextTasks]
-  );
-
-  const filtered = nextTasks.filter(
-    (t) =>
-      (!tag || t.context_tags.includes(tag)) &&
-      (!energy || t.energy === energy)
+  const { tag, setTag, energy, setEnergy, allTags, filtered } = useTaskFilters(
+    nextTasks,
+    "clarity.filters.next"
   );
 
   return (
@@ -47,39 +39,14 @@ export default function NextPage() {
         subtitle="Everything you could do next — drag into your own order; unplaced tasks rank by leverage"
       />
 
-      {(allTags.length > 0 || nextTasks.some((t) => t.energy)) && (
-        <div className="mb-4 flex flex-wrap items-center gap-1.5">
-          {allTags.map((t) => (
-            <button
-              key={t}
-              onClick={() => setTag(tag === t ? null : t)}
-              className={clsx(
-                "rounded-full border px-2.5 py-1 text-xs cursor-pointer",
-                tag === t
-                  ? "border-accent bg-accent-soft text-accent font-medium"
-                  : "border-line text-ink-soft hover:border-accent"
-              )}
-            >
-              @{t}
-            </button>
-          ))}
-          <span className="mx-1 h-4 border-l border-line" />
-          {(["low", "medium", "high"] as const).map((e) => (
-            <button
-              key={e}
-              onClick={() => setEnergy(energy === e ? null : e)}
-              className={clsx(
-                "rounded-full border px-2.5 py-1 text-xs cursor-pointer",
-                energy === e
-                  ? "border-accent bg-accent-soft text-accent font-medium"
-                  : "border-line text-ink-soft hover:border-accent"
-              )}
-            >
-              {e} energy
-            </button>
-          ))}
-        </div>
-      )}
+      <FilterChips
+        tag={tag}
+        setTag={setTag}
+        energy={energy}
+        setEnergy={setEnergy}
+        allTags={allTags}
+        showEnergy={nextTasks.some((t) => t.energy)}
+      />
 
       <TaskList
         tasks={filtered}

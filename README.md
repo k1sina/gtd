@@ -9,7 +9,7 @@ with a partner.
 ## What works today (web)
 
 - **Capture** — global quick-add (press `N` or `⌘K`) with natural-language
-  parsing: `Call mom tomorrow 3pm @phone #Family !urgent ~15m every week`
+  parsing: `Call mom tomorrow 3pm @phone #Family !urgent ^low ~15m every week`
 - **Clarify** — guided inbox triage: 2-minute rule, next action, waiting-for,
   someday, trash (multi-step outcomes are just tasks you add subtasks to —
   a task with subtasks IS a project)

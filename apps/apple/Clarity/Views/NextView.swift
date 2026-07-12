@@ -45,7 +45,12 @@ struct NextView: View {
             }
             if !allTags.isEmpty || ranked.contains(where: { $0.energy != nil }) {
                 Section {
-                    filterChips
+                    TaskFilterChips(
+                        storageKey: "clarity.filters.next",
+                        allTags: allTags,
+                        showEnergy: ranked.contains(where: { $0.energy != nil }),
+                        tagFilter: $tagFilter,
+                        energyFilter: $energyFilter)
                 }
             }
             Section {
@@ -117,42 +122,6 @@ struct NextView: View {
             }
             await load()
         }
-    }
-
-    /// Context-tag and energy filter chips — mirrors the web next page.
-    private var filterChips: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(allTags, id: \.self) { tag in
-                    chip("@\(tag)", selected: tagFilter == tag) {
-                        tagFilter = tagFilter == tag ? nil : tag
-                    }
-                }
-                if !allTags.isEmpty {
-                    Divider().frame(height: 16)
-                }
-                ForEach(Energy.allCases, id: \.self) { energy in
-                    chip("\(energy.rawValue) energy", selected: energyFilter == energy) {
-                        energyFilter = energyFilter == energy ? nil : energy
-                    }
-                }
-            }
-        }
-        .listRowBackground(Color.clear)
-    }
-
-    private func chip(_ label: String, selected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Text(label)
-                .font(.caption)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 5)
-                .background(
-                    selected ? Color.indigo.opacity(0.18) : Color.secondary.opacity(0.08),
-                    in: Capsule())
-                .foregroundStyle(selected ? Color.indigo : Color.secondary)
-        }
-        .buttonStyle(.plain)
     }
 
     private func load() async {

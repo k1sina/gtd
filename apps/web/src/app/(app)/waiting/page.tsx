@@ -2,6 +2,7 @@
 
 import { Hourglass } from "lucide-react";
 import { useMemo } from "react";
+import { FilterChips, useTaskFilters } from "@/components/filter-chips";
 import { PageHeader, TaskList } from "@/components/task-list";
 import { EmptyState } from "@/components/ui";
 import { useTasks } from "@/lib/data";
@@ -22,19 +23,41 @@ export default function WaitingPage() {
     [tasks]
   );
 
+  // Contexts double as agendas here (@sara, @boss — GTD's per-person lists).
+  const { tag, setTag, energy, setEnergy, allTags, filtered } = useTaskFilters(
+    waiting,
+    "clarity.filters.waiting"
+  );
+
   return (
     <div>
       <PageHeader
         title="Waiting for"
         subtitle="Delegated or blocked — chase these during your weekly review"
       />
+      <FilterChips
+        tag={tag}
+        setTag={setTag}
+        energy={energy}
+        setEnergy={setEnergy}
+        allTags={allTags}
+        showEnergy={waiting.some((t) => t.energy)}
+      />
       <TaskList
-        tasks={waiting}
+        tasks={filtered}
         emptyState={
           <EmptyState
             icon={<Hourglass size={22} />}
-            title="Not waiting on anyone"
-            hint="When you delegate something, clarify it as “Waiting for” to track it here."
+            title={
+              waiting.length === 0
+                ? "Not waiting on anyone"
+                : "Nothing matches the filters"
+            }
+            hint={
+              waiting.length === 0
+                ? "When you delegate something, clarify it as “Waiting for” to track it here."
+                : undefined
+            }
           />
         }
       />

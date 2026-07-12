@@ -56,6 +56,10 @@ struct TaskRowView: View {
                         Label("\(stats.done)/\(stats.total)", systemImage: "checklist")
                             .foregroundStyle(.secondary)
                     }
+                    if let energy = actionTask.energy {
+                        Label(energy.rawValue, systemImage: "bolt")
+                            .foregroundStyle(energy.tint)
+                    }
                     ForEach(task.contextTags, id: \.self) { tag in
                         Text("@\(tag)").foregroundStyle(.indigo)
                     }
@@ -78,5 +82,16 @@ struct TaskRowView: View {
         .opacity(dimmed ? 0.5 : 1)
         .contentShape(Rectangle())
         .onTapGesture(perform: onTap)
+    }
+}
+
+extension Energy {
+    /// Low = easy wins (green) … high = demands focus (red).
+    var tint: Color {
+        switch self {
+        case .low: return .green
+        case .medium: return .orange
+        case .high: return .red
+        }
     }
 }

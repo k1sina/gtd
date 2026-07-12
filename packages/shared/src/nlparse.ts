@@ -11,11 +11,13 @@
 //              by the caller; the new task files as a subtask)
 //   priority   !urgent (urgency 4) | !important (importance 4) |
 //              !someday (status someday)
+//   energy     ^low | ^med | ^medium | ^high
 //   estimate   ~30m | ~2h | ~1h30m
 //   recurrence every day | every N days | every week | every monday |
 //              every weekday | every N weeks | every month | every year
 
 import { formatRule, type RecurrenceRule } from "./recurrence";
+import type { Energy } from "./types";
 
 export interface ParsedQuickAdd {
   title: string;
@@ -25,6 +27,7 @@ export interface ParsedQuickAdd {
   urgency: number | null;
   importance: number | null;
   someday: boolean;
+  energy: Energy | null;
   estimatedMinutes: number | null;
   recurrenceRule: string | null;
 }
@@ -73,6 +76,7 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
     urgency: null,
     importance: null,
     someday: false,
+    energy: null,
     estimatedMinutes: null,
     recurrenceRule: null,
   };
@@ -104,6 +108,12 @@ export function parseQuickAdd(input: string, now: Date = new Date()): ParsedQuic
   });
   eat(/(?<=\s)!someday\b/i, () => {
     out.someday = true;
+  });
+
+  // --- energy ^low ^med ^high ------------------------------------------------
+  eat(/(?<=\s)\^(low|med(?:ium)?|high)\b/i, (m) => {
+    const word = m[1]!.toLowerCase();
+    out.energy = word === "low" ? "low" : word === "high" ? "high" : "medium";
   });
 
   // --- estimate ~30m ~2h ~1h30m ---------------------------------------------

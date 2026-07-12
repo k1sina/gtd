@@ -135,6 +135,7 @@ public struct NewTaskPayload: Encodable, Sendable {
             importance: parsed.importance ?? 2,
             dueAt: parsed.dueAt,
             estimatedMinutes: parsed.estimatedMinutes,
+            energy: parsed.energy,
             contextTags: parsed.tags,
             recurrenceRule: parsed.recurrenceRule
         )

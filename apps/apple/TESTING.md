@@ -144,7 +144,8 @@ switcher is in each tab's toolbar).
   line (parent title above it, in small type); the circle completes the
   subtask, tapping opens the parent. A red **stalled** label means no
   subtask is an actionable next step.
-- Filter chips narrow by `@context` tag and energy level.
+- Filter chips narrow by `@context` tag and energy level (also on the
+  Someday and Waiting lists); the selection persists between visits.
 - Tap the circle to **complete** a task. Completing a repeating task
   automatically schedules its next occurrence — pull to refresh and you'll
   see the new one.
@@ -218,6 +219,7 @@ field preview what the parser understood before you commit.
 | `@phone @home` | context tags |
 | `#Family` | files as a subtask of the open top-level task whose title matches |
 | `!urgent` / `!important` | urgency / importance = 4 |
+| `^low`, `^med`, `^high` | energy level |
 | `!someday` | goes to Someday instead of Inbox |
 | `~15m`, `~2h`, `~1h30m` | time estimate |
 | `every day`, `every 3 days`, `every monday`, `every weekday`, `every 2 weeks`, `every month` | repeating task (RRULE) |
