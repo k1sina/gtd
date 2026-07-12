@@ -28,23 +28,47 @@ import { createClient } from "@/lib/supabase/client";
 import { QuickAdd } from "./quick-add";
 import { Button, Dialog, Input } from "./ui";
 
-const NAV = [
-  { href: "/today", label: "Today", icon: Sun },
-  // Assistant is hidden for now — the user drives Clarity through Claude via
-  // MCP instead. The /assistant route still works; re-add to restore it.
-  { href: "/inbox", label: "Inbox", icon: Inbox, badge: "inbox" as const },
-  { href: "/next", label: "Next actions", icon: LayoutList },
-  { href: "/scheduled", label: "Scheduled", icon: CalendarClock },
-  { href: "/waiting", label: "Waiting for", icon: Hourglass },
-  { href: "/someday", label: "Someday / maybe", icon: Moon },
-  null,
-  { href: "/habits", label: "Habits", icon: RefreshCcw },
-  null,
-  { href: "/review", label: "Reviews", icon: Compass },
-  { href: "/goals", label: "Goals & values", icon: Heart },
-  null,
-  { href: "/search", label: "Search", icon: Search },
-  { href: "/settings", label: "Settings", icon: Settings },
+// Sidebar groups follow the GTD loop: engage first (you live in Today/Next),
+// then capture, then the parked/upcoming lists, then reflection. Search and
+// Settings live outside the nav (top action / footer). Assistant is hidden
+// for now — the user drives Clarity through Claude via MCP instead; the
+// /assistant route still works, re-add an entry to restore it. Mirrored in
+// apps/apple MainView.swift AppSection.groups.
+const NAV_GROUPS: {
+  label?: string;
+  items: {
+    href: string;
+    label: string;
+    icon: typeof Sun;
+    badge?: "inbox";
+  }[];
+}[] = [
+  {
+    items: [
+      { href: "/today", label: "Today", icon: Sun },
+      { href: "/next", label: "Next actions", icon: LayoutList },
+    ],
+  },
+  {
+    label: "Capture",
+    items: [{ href: "/inbox", label: "Inbox", icon: Inbox, badge: "inbox" }],
+  },
+  {
+    label: "Upcoming & parked",
+    items: [
+      { href: "/scheduled", label: "Scheduled", icon: CalendarClock },
+      { href: "/waiting", label: "Waiting for", icon: Hourglass },
+      { href: "/someday", label: "Someday / maybe", icon: Moon },
+      { href: "/habits", label: "Habits", icon: RefreshCcw },
+    ],
+  },
+  {
+    label: "Reflect",
+    items: [
+      { href: "/review", label: "Reviews", icon: Compass },
+      { href: "/goals", label: "Goals & values", icon: Heart },
+    ],
+  },
 ];
 
 export function AppShell({
@@ -88,11 +112,14 @@ export function AppShell({
       } else if (!typing && e.key.toLowerCase() === "n" && !e.metaKey && !e.ctrlKey && !e.altKey) {
         e.preventDefault();
         setQuickAddOpen(true);
+      } else if (!typing && e.key === "/" && !e.metaKey && !e.ctrlKey && !e.altKey) {
+        e.preventDefault();
+        router.push("/search");
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [router]);
 
   async function signOut() {
     const supabase = createClient();
@@ -194,8 +221,8 @@ export function AppShell({
           )}
         </div>
 
-        {/* Quick add */}
-        <div className="p-3">
+        {/* Quick actions: capture + search, always within reach */}
+        <div className="flex flex-col gap-2 p-3">
           <button
             onClick={() => setQuickAddOpen(true)}
             className="flex w-full items-center gap-2 rounded-md border border-dashed border-line px-3 py-2 text-sm text-ink-soft hover:border-accent hover:text-accent cursor-pointer"
@@ -206,53 +233,87 @@ export function AppShell({
               N
             </kbd>
           </button>
+          <Link
+            href="/search"
+            className={clsx(
+              "flex w-full items-center gap-2 rounded-md border px-3 py-2 text-sm",
+              pathname.startsWith("/search")
+                ? "border-accent bg-accent-soft text-accent"
+                : "border-line text-ink-soft hover:border-accent hover:text-accent"
+            )}
+          >
+            <Search size={15} />
+            Search
+            <kbd className="ml-auto rounded border border-line bg-canvas px-1.5 text-[10px] text-ink-faint">
+              /
+            </kbd>
+          </Link>
         </div>
 
         {/* Nav */}
         <nav className="thin-scroll flex-1 overflow-y-auto px-3 pb-3">
-          {NAV.map((item, i) =>
-            item === null ? (
-              <div key={i} className="my-2 border-t border-line" />
-            ) : (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={clsx(
-                  "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
-                  pathname === item.href ||
-                    (item.href !== "/today" && pathname.startsWith(item.href))
-                    ? "bg-accent-soft font-medium text-accent"
-                    : "text-ink-soft hover:bg-canvas hover:text-ink"
-                )}
-              >
-                <item.icon size={16} />
-                <span className="flex-1">{item.label}</span>
-                {item.badge === "inbox" && inboxCount > 0 && (
-                  <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
-                    {inboxCount}
-                  </span>
-                )}
-              </Link>
-            )
-          )}
+          {NAV_GROUPS.map((group, i) => (
+            <div key={group.label ?? i} className={clsx(i > 0 && "mt-4")}>
+              {group.label && (
+                <p className="px-2.5 pb-1 text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                  {group.label}
+                </p>
+              )}
+              {group.items.map((item) => (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={clsx(
+                    "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
+                    pathname === item.href ||
+                      (item.href !== "/today" && pathname.startsWith(item.href))
+                      ? "bg-accent-soft font-medium text-accent"
+                      : "text-ink-soft hover:bg-canvas hover:text-ink"
+                  )}
+                >
+                  <item.icon size={16} />
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge === "inbox" && inboxCount > 0 && (
+                    <span className="rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold leading-none text-white">
+                      {inboxCount}
+                    </span>
+                  )}
+                </Link>
+              ))}
+            </div>
+          ))}
         </nav>
 
-        {/* User */}
-        <div className="flex items-center gap-2 border-t border-line p-3">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-canvas text-xs font-semibold text-ink-soft uppercase">
-            {(displayName || userEmail).slice(0, 1)}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-xs font-medium">{displayName || "You"}</p>
-            <p className="truncate text-[11px] text-ink-faint">{userEmail}</p>
-          </div>
-          <button
-            onClick={signOut}
-            title="Sign out"
-            className="rounded p-1.5 text-ink-faint hover:bg-canvas hover:text-ink cursor-pointer"
+        {/* Footer: settings + user */}
+        <div className="border-t border-line p-3">
+          <Link
+            href="/settings"
+            className={clsx(
+              "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
+              pathname.startsWith("/settings")
+                ? "bg-accent-soft font-medium text-accent"
+                : "text-ink-soft hover:bg-canvas hover:text-ink"
+            )}
           >
-            <LogOut size={14} />
-          </button>
+            <Settings size={16} />
+            Settings
+          </Link>
+          <div className="mt-2 flex items-center gap-2 px-1">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-canvas text-xs font-semibold text-ink-soft uppercase">
+              {(displayName || userEmail).slice(0, 1)}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-medium">{displayName || "You"}</p>
+              <p className="truncate text-[11px] text-ink-faint">{userEmail}</p>
+            </div>
+            <button
+              onClick={signOut}
+              title="Sign out"
+              className="rounded p-1.5 text-ink-faint hover:bg-canvas hover:text-ink cursor-pointer"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
         </div>
       </aside>
 

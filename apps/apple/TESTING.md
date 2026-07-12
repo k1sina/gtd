@@ -115,11 +115,12 @@ Sign in with your Clarity account (created on the web). The session persists
 in the keychain; you won't be asked again.
 
 The iPhone app has five tabs — **Today, Inbox, Next, Browse, Settings** —
-where Browse holds everything else (Scheduled, Waiting, Someday, Habits,
-Reviews, Goals, Assistant, Search). The Mac app shows all
-sections in a grouped sidebar, with the **space switcher** at the top
-(switch spaces, create a shared space, or join one from a pasted invite
-link; on iPhone the switcher is in each tab's toolbar).
+where Browse holds everything else (Search first, then Scheduled, Waiting,
+Someday, Habits, Reviews, Goals). The Mac app shows all sections in a
+GTD-grouped sidebar (Today/Next → Capture → Upcoming & parked → Reflect),
+with the **space switcher** and a search button at the top (switch spaces,
+create a shared space, or join one from a pasted invite link; on iPhone the
+switcher is in each tab's toolbar).
 
 ### Today
 - **Due & overdue** — everything dated before end of today, ranked by
