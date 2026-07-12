@@ -67,6 +67,15 @@ body {
   color: var(--color-ink);
 }
 
+/* The app never scrolls sideways — clip anything that tries (long titles,
+ * RTL runs, in-flight drag artifacts). clip, unlike hidden, can't turn the
+ * root into a scroll container; hidden is the older-Safari fallback. */
+html,
+body {
+  overflow-x: hidden;
+  overflow-x: clip;
+}
+
 ::selection {
   background: #c7d2fe;
 }
