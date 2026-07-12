@@ -34,6 +34,21 @@ public struct TaskRepository: Sendable {
         return try await query.execute().value
     }
 
+    /// Every context tag used in the space (distinct, sorted) — for tag
+    /// suggestions in the editor.
+    public func contextTags() async throws -> [String] {
+        struct Row: Decodable {
+            let contextTags: [String]
+        }
+        let rows: [Row] = try await ctx.client
+            .from("tasks")
+            .select("context_tags")
+            .eq("space_id", value: ctx.spaceId.uuidString)
+            .execute()
+            .value
+        return Array(Set(rows.flatMap(\.contextTags))).sorted()
+    }
+
     /// Number of unclarified inbox items (sidebar badge).
     public func inboxCount() async throws -> Int {
         let response = try await ctx.client

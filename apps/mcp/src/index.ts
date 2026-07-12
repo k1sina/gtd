@@ -41,7 +41,7 @@ server.registerTool(
   "list_tasks",
   {
     description:
-      "List the user's tasks. Call this before answering questions about workload, priorities, overdue items, or what to do next. Returns id, title, status, urgency/importance (1-4), quadrant, due date, tags, estimate. A task with has_subtasks is a project; stalled means it has no actionable next-step subtask. Pass parent_task_id to list a task's subtasks.",
+      "List the user's tasks. Call this before answering questions about workload, priorities, overdue items, or what to do next. Returns id, title, status, urgency/importance (1-4), quadrant, due date, tags, energy, estimate. A task with has_subtasks is a project; stalled means it has no actionable next-step subtask. Pass parent_task_id to list a task's subtasks. Filter by context_tag/energy to answer \"what can I do at home with low energy?\".",
     inputSchema: {
       status: z
         .enum(["inbox", "next", "waiting", "scheduled", "someday", "done", "all_open"])
@@ -51,6 +51,14 @@ server.registerTool(
         .string()
         .optional()
         .describe("List the subtasks of this task instead of top-level tasks"),
+      context_tag: z
+        .string()
+        .optional()
+        .describe("Only tasks with this context tag (e.g. 'home', 'phone')"),
+      energy: z
+        .enum(["low", "medium", "high"])
+        .optional()
+        .describe("Only tasks at this energy level"),
       due_within_days: z
         .number()
         .optional()
@@ -73,6 +81,10 @@ server.registerTool(
         .string()
         .optional()
         .describe("For multi-step outcomes: what does 'done' look like?"),
+      energy: z
+        .enum(["low", "medium", "high"])
+        .optional()
+        .describe("Energy the task demands"),
       parent_task_id: z
         .string()
         .optional()
@@ -109,6 +121,14 @@ server.registerTool(
         .optional(),
       urgency: z.number().optional(),
       importance: z.number().optional(),
+      energy: z
+        .enum(["low", "medium", "high"])
+        .optional()
+        .describe("Energy the task demands"),
+      context_tags: z
+        .array(z.string())
+        .optional()
+        .describe("Replaces the task's context tags"),
       due_at: z.string().optional().describe("ISO 8601, or empty string to clear"),
       defer_until: z.string().optional(),
       parent_task_id: z

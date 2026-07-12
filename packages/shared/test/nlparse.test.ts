@@ -89,4 +89,15 @@ describe("parseQuickAdd", () => {
     expect(p.title).toBe("Email keivan.sina@gmail.com about trip");
     expect(p.tags).toEqual([]);
   });
+
+  it("parses energy levels", () => {
+    expect(parseQuickAdd("File taxes ^high", now).energy).toBe("high");
+    expect(parseQuickAdd("Sort photos ^low @home", now).energy).toBe("low");
+    expect(parseQuickAdd("Review notes ^med", now).energy).toBe("medium");
+    expect(parseQuickAdd("Plan sprint ^medium", now).energy).toBe("medium");
+    const p = parseQuickAdd("Sort photos ^low", now);
+    expect(p.title).toBe("Sort photos");
+    expect(parseQuickAdd("Solve 2^high math puzzle", now).energy).toBe(null);
+    expect(parseQuickAdd("No energy here", now).energy).toBe(null);
+  });
 });

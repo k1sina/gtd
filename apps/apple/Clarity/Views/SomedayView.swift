@@ -11,18 +11,47 @@ struct SomedayView: View {
     @State private var editing: TaskItem?
     @State private var loading = true
     @State private var error: String?
+    @State private var tagFilter: String?
+    @State private var energyFilter: Energy?
+
+    private var allTags: [String] {
+        Array(Set(tasks.flatMap(\.contextTags))).sorted()
+    }
+
+    private var filtered: [TaskItem] {
+        tasks.filter { task in
+            (tagFilter == nil || task.contextTags.contains(tagFilter!))
+                && (energyFilter == nil || task.energy == energyFilter)
+        }
+    }
+
+    private var filtersActive: Bool {
+        tagFilter != nil || energyFilter != nil
+    }
 
     var body: some View {
         List {
             if let error {
                 Section { Text(error).foregroundStyle(.red).font(.footnote) }
             }
+            if !allTags.isEmpty || tasks.contains(where: { $0.energy != nil }) {
+                Section {
+                    TaskFilterChips(
+                        storageKey: "clarity.filters.someday",
+                        allTags: allTags,
+                        showEnergy: tasks.contains(where: { $0.energy != nil }),
+                        tagFilter: $tagFilter,
+                        energyFilter: $energyFilter)
+                }
+            }
             Section {
                 if tasks.isEmpty && !loading {
                     Text("Nothing parked — capture with \"!someday\" or file inbox items here.")
                         .foregroundStyle(.secondary)
+                } else if filtered.isEmpty && !loading {
+                    Text("Nothing matches the filters.").foregroundStyle(.secondary)
                 }
-                ForEach(tasks) { task in
+                ForEach(filtered) { task in
                     TaskRowView(task: task, subtaskStats: subtaskCounts[task.id]) {
                         Task { await complete(task) }
                     } onTap: {
@@ -40,7 +69,8 @@ struct SomedayView: View {
                         }
                     }
                 }
-                .onMove(perform: moveRows)
+                // Reordering a filtered subset would scramble hidden rows.
+                .onMove(perform: filtersActive ? nil : moveRows)
             } footer: {
                 if !tasks.isEmpty {
                     Text("Swipe right to make something a next action. Drag to reorder.")
@@ -53,7 +83,7 @@ struct SomedayView: View {
         #if os(iOS)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                if tasks.count > 1 { EditButton() }
+                if tasks.count > 1 && !filtersActive { EditButton() }
             }
         }
         #endif

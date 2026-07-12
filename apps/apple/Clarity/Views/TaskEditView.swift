@@ -29,6 +29,7 @@ struct TaskEditView: View {
     @State private var recurrence: String?
     @State private var subtasks: [TaskItem] = []
     @State private var newSubtask = ""
+    @State private var spaceTags: [String] = []
     @State private var members: [SpaceMemberInfo] = []
     @State private var assignedTo: UUID?
     @State private var busy = false
@@ -143,7 +144,34 @@ struct TaskEditView: View {
                             Text(energy.rawValue.capitalized).tag(Energy?.some(energy))
                         }
                     }
+                    .pickerStyle(.segmented)
                     TextField("Tags (comma separated)", text: $tagsText)
+                    if !spaceTags.isEmpty {
+                        // Tap an existing context to toggle it — no retyping.
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(spaceTags, id: \.self) { tag in
+                                    let selected = currentTags.contains(tag)
+                                    Button {
+                                        toggleTag(tag)
+                                    } label: {
+                                        Text("@\(tag)")
+                                            .font(.caption)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                            .background(
+                                                selected
+                                                    ? Color.indigo.opacity(0.18)
+                                                    : Color.secondary.opacity(0.08),
+                                                in: Capsule())
+                                            .foregroundStyle(selected ? Color.indigo : Color.secondary)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                        }
+                        .listRowBackground(Color.clear)
+                    }
                 }
                 subtasksSection
                 CommentsSection(task: task)
@@ -157,6 +185,7 @@ struct TaskEditView: View {
             .task {
                 await loadSubtasks()
                 await loadMembers()
+                await loadSpaceTags()
             }
             .navigationTitle("Edit task")
             #if os(iOS)
@@ -236,6 +265,31 @@ struct TaskEditView: View {
             }
             await loadSubtasks()
         }
+    }
+
+    /// Tags currently in the (comma separated) text field, normalised.
+    private var currentTags: Set<String> {
+        Set(
+            tagsText.split(separator: ",")
+                .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+                .filter { !$0.isEmpty })
+    }
+
+    private func toggleTag(_ tag: String) {
+        var tags = tagsText.split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespaces).lowercased() }
+            .filter { !$0.isEmpty }
+        if let index = tags.firstIndex(of: tag) {
+            tags.remove(at: index)
+        } else {
+            tags.append(tag)
+        }
+        tagsText = tags.joined(separator: ", ")
+    }
+
+    private func loadSpaceTags() async {
+        guard let ctx = try? session.requireContext() else { return }
+        spaceTags = (try? await TaskRepository(ctx).contextTags()) ?? []
     }
 
     private func loadMembers() async {

@@ -136,18 +136,13 @@ struct ClarifyView: View {
                     } label: {
                         Label("Someday", systemImage: "moon.zzz")
                     }
-                    Button {
-                        Task { await makeProject(task) }
-                    } label: {
-                        Label("It's a project", systemImage: "folder.badge.plus")
-                    }
                     Button(role: .destructive) {
                         Task { await trash(task) }
                     } label: {
                         Label("Trash", systemImage: "trash")
                     }
                 } footer: {
-                    Text("Is it actionable? Under 2 minutes → do it now. Multiple steps → it's a project. Not yours → waiting for. Not now → someday.")
+                    Text("Is it actionable? Under 2 minutes → do it now. Multiple steps → make it a next action and add subtasks in its editor. Not yours → waiting for. Not now → someday.")
                 }
             }
             if let error {
@@ -208,26 +203,6 @@ struct ClarifyView: View {
         do {
             let ctx = try session.requireContext()
             _ = try await TaskRepository(ctx).update(id: task.id, patch: patch)
-            advance()
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-
-    /// Turn the capture into a project: the item itself becomes the parent
-    /// (a task with subtasks IS a project) and gets a "define first next
-    /// action" seed subtask — exactly like the web card.
-    private func makeProject(_ task: TaskItem) async {
-        do {
-            let ctx = try session.requireContext()
-            var patch = TaskPatch()
-            patch.status = .next
-            if let notes = task.notes, !notes.isEmpty { patch.outcome = notes }
-            _ = try await TaskRepository(ctx).update(id: task.id, patch: patch)
-            _ = try await TaskRepository(ctx).create(NewTaskPayload(
-                spaceId: ctx.spaceId, createdBy: ctx.userId,
-                title: "Define first next action for “\(task.title)”",
-                status: .next, parentTaskId: task.id))
             advance()
         } catch {
             self.error = error.localizedDescription

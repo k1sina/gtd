@@ -14,6 +14,7 @@ function row(overrides: Record<string, unknown> = {}) {
     due_at: null,
     defer_until: null,
     estimated_minutes: null,
+    energy: null,
     context_tags: [],
     waiting_on: null,
     recurrence_rule: null,
@@ -55,6 +56,13 @@ describe("buildUpdatePatch", () => {
   it("passes sort_order through for manual reordering", () => {
     expect(buildUpdatePatch({ sort_order: 2.5 })).toEqual({ sort_order: 2.5 });
   });
+
+  it("passes energy and context_tags through", () => {
+    expect(buildUpdatePatch({ energy: "low", context_tags: ["home"] })).toEqual({
+      energy: "low",
+      context_tags: ["home"],
+    });
+  });
 });
 
 describe("filterAndRankTasks", () => {
@@ -77,6 +85,25 @@ describe("filterAndRankTasks", () => {
     ];
     const out = filterAndRankTasks(rows, { parent_task_id: "p" }, now);
     expect(out.map((t) => t.id)).toEqual(["a"]);
+  });
+
+  it("filters by context_tag and energy", () => {
+    const rows = [
+      row({ id: "home-low", context_tags: ["home"], energy: "low" }),
+      row({ id: "home-high", context_tags: ["home"], energy: "high" }),
+      row({ id: "office", context_tags: ["office"], energy: "low" }),
+      row({ id: "untagged" }),
+    ];
+    expect(
+      filterAndRankTasks(rows, { context_tag: "home" }, now).map((t) => t.id)
+    ).toEqual(expect.arrayContaining(["home-low", "home-high"]));
+    const out = filterAndRankTasks(
+      rows,
+      { context_tag: "home", energy: "low" },
+      now
+    );
+    expect(out.map((t) => t.id)).toEqual(["home-low"]);
+    expect(out[0]!.energy).toBe("low");
   });
 
   it("orders subtask listings by sort_order (the surfacing order), not priority", () => {

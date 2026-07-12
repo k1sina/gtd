@@ -21,6 +21,7 @@ interface TaskRow {
   due_at: string | null;
   defer_until: string | null;
   estimated_minutes: number | null;
+  energy: string | null;
   context_tags: string[];
   waiting_on: string | null;
   recurrence_rule: string | null;
@@ -51,6 +52,12 @@ export function filterAndRankTasks(rows: TaskRow[], input: ToolInput, now: Date)
   let tasks = input.parent_task_id
     ? nodes.filter((t) => t.parent_task_id === input.parent_task_id)
     : nodes.filter((t) => !t.parent_task_id);
+  if (input.context_tag) {
+    tasks = tasks.filter((t) => t.context_tags.includes(input.context_tag as string));
+  }
+  if (input.energy) {
+    tasks = tasks.filter((t) => t.energy === input.energy);
+  }
   if (input.due_within_days != null) {
     const cutoff = new Date(now.getTime() + Number(input.due_within_days) * 86400000);
     tasks = tasks.filter((t) => t.due_at && new Date(t.due_at) <= cutoff);
@@ -79,6 +86,7 @@ export function filterAndRankTasks(rows: TaskRow[], input: ToolInput, now: Date)
       due_at: t.due_at,
       deferred: isDeferred({ ...t, defer_until: t.defer_until ?? undefined }, now),
       estimated_minutes: t.estimated_minutes,
+      energy: t.energy,
       tags: t.context_tags,
       waiting_on: t.waiting_on,
       recurring: t.recurrence_rule,
@@ -100,6 +108,8 @@ export function buildUpdatePatch(input: ToolInput): Record<string, unknown> {
     "status",
     "urgency",
     "importance",
+    "energy",
+    "context_tags",
     "estimated_minutes",
     "waiting_on",
     "sort_order",
@@ -116,7 +126,7 @@ async function listTasks(ctx: ToolContext, input: ToolInput) {
   let query = ctx.supabase
     .from("tasks")
     .select(
-      "id, title, status, urgency, importance, due_at, defer_until, estimated_minutes, context_tags, waiting_on, recurrence_rule, outcome, parent_task_id, sort_order, created_at, notes"
+      "id, title, status, urgency, importance, due_at, defer_until, estimated_minutes, energy, context_tags, waiting_on, recurrence_rule, outcome, parent_task_id, sort_order, created_at, notes"
     )
     .eq("space_id", ctx.spaceId);
 
@@ -151,6 +161,7 @@ async function createTask(ctx: ToolContext, input: ToolInput) {
       due_at: input.due_at || null,
       urgency: input.urgency ?? 2,
       importance: input.importance ?? 2,
+      energy: input.energy ?? null,
       estimated_minutes: input.estimated_minutes ?? null,
       context_tags: input.context_tags ?? [],
       recurrence_rule: input.recurrence_rule ?? null,

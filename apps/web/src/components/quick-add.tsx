@@ -9,6 +9,7 @@ import {
   Moon,
   RefreshCcw,
   Tag,
+  Zap,
 } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 import { useCreateTask, useTasks } from "@/lib/data";
@@ -53,6 +54,7 @@ export function QuickAdd({ onClose }: { onClose: () => void }) {
       context_tags: parsed.tags,
       urgency: parsed.urgency ?? undefined,
       importance: parsed.importance ?? undefined,
+      energy: parsed.energy,
       estimated_minutes: parsed.estimatedMinutes,
       recurrence_rule: parsed.recurrenceRule,
     });
@@ -122,6 +124,12 @@ export function QuickAdd({ onClose }: { onClose: () => void }) {
               {parsed.importance ? "important" : ""}
             </Badge>
           )}
+          {parsed.energy && (
+            <Badge tone="green">
+              <Zap size={11} />
+              {parsed.energy} energy
+            </Badge>
+          )}
           {parsed.estimatedMinutes && (
             <Badge tone="neutral">
               <AlarmClock size={11} />
@@ -145,7 +153,7 @@ export function QuickAdd({ onClose }: { onClose: () => void }) {
         </span>
         <span>
           Syntax: date · @tag · #parent task · !urgent !important !someday ·
-          ~30m · every week
+          ^low ^high · ~30m · every week
         </span>
       </div>
     </Dialog>

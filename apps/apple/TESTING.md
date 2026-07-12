@@ -46,7 +46,7 @@ cd apps/apple
 ./scripts/test-swift.sh
 ```
 
-This runs two Swift Testing suites (31 tests):
+This runs the ClarityCore + ClarityKit Swift Testing suites:
 
 - **ClarityCore** — priority scoring, the recurrence engine, and the
   quick-add parser. These are line-for-line mirrors of the vitest suites in
@@ -129,9 +129,9 @@ switcher is in each tab's toolbar).
   - tap → full editor (status, priority, dates, recurrence, tags, subtasks…)
 - The **Clarify** toolbar button walks the inbox one item at a time with
   the full GTD decision set: *Did it (2-min rule)*, *Next*, *Schedule*,
-  *Waiting for…*, *Someday*, *It's a project* (the item becomes a parent
-  task with a "define first next action" seed subtask), *Trash* — same
-  flow as the web.
+  *Waiting for…*, *Someday*, *Trash* — same flow as the web. Multi-step
+  item? Send it to Next and add subtasks in its editor (a task with
+  subtasks IS a project).
 
 ### Next
 - Every next action in your manual order; tasks you haven't placed rank by
@@ -144,7 +144,8 @@ switcher is in each tab's toolbar).
   line (parent title above it, in small type); the circle completes the
   subtask, tapping opens the parent. A red **stalled** label means no
   subtask is an actionable next step.
-- Filter chips narrow by `@context` tag and energy level.
+- Filter chips narrow by `@context` tag and energy level (also on the
+  Someday and Waiting lists); the selection persists between visits.
 - Tap the circle to **complete** a task. Completing a repeating task
   automatically schedules its next occurrence — pull to refresh and you'll
   see the new one.
@@ -176,7 +177,8 @@ switcher is in each tab's toolbar).
 - **Goals & values** — life values and quarterly goals with value links,
   statuses, and scores.
 - **Assistant** — the same GTD coach as the web `/assistant` page; it can
-  read and change your tasks (including subtasks) and plan your day.
+  read and change your tasks (including subtasks). Currently hidden from
+  navigation — the user drives Clarity through Claude via MCP instead.
   Requires the web deployment to have `ANTHROPIC_API_KEY` set.
 - **Search** — full-text over titles and notes.
 
@@ -217,6 +219,7 @@ field preview what the parser understood before you commit.
 | `@phone @home` | context tags |
 | `#Family` | files as a subtask of the open top-level task whose title matches |
 | `!urgent` / `!important` | urgency / importance = 4 |
+| `^low`, `^med`, `^high` | energy level |
 | `!someday` | goes to Someday instead of Inbox |
 | `~15m`, `~2h`, `~1h30m` | time estimate |
 | `every day`, `every 3 days`, `every monday`, `every weekday`, `every 2 weeks`, `every month` | repeating task (RRULE) |
@@ -266,8 +269,8 @@ open. If you're signed out, Siri answers "Please sign in to Clarity first."
 
 A 10-minute pass that exercises every moving part:
 
-1. `./scripts/test-swift.sh` → 62 tests green (34 ClarityCore +
-   28 ClarityKit).
+1. `./scripts/test-swift.sh` → all tests green (ClarityCore +
+   ClarityKit).
 2. Build & run **Clarity-macOS**; sign in.
 3. Capture `Water plants every 3 days ~10m @home` → appears in **Inbox**
    with a repeat icon and the parse chips shown beforehand.

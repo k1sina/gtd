@@ -19,6 +19,7 @@ public struct ParsedQuickAdd: Equatable, Sendable {
     public var urgency: Int?
     public var importance: Int?
     public var someday: Bool
+    public var energy: Energy?
     public var estimatedMinutes: Int?
     public var recurrenceRule: String?
 }
@@ -42,6 +43,7 @@ public func parseQuickAdd(
         urgency: nil,
         importance: nil,
         someday: false,
+        energy: nil,
         estimatedMinutes: nil,
         recurrenceRule: nil
     )
@@ -105,6 +107,15 @@ public func parseQuickAdd(
     eat(#"\s!urgent\b"#) { _ in out.urgency = 4 }
     eat(#"\s!important\b"#) { _ in out.importance = 4 }
     eat(#"\s!someday\b"#) { _ in out.someday = true }
+
+    // --- energy ^low ^med ^high ------------------------------------------------
+    eat(#"\s\^(low|med(?:ium)?|high)\b"#) { m in
+        switch m[1]!.lowercased() {
+        case "low": out.energy = .low
+        case "high": out.energy = .high
+        default: out.energy = .medium
+        }
+    }
 
     // --- estimate ~30m ~2h ~1h30m ---------------------------------------------
     eat(#"\s~(?:(\d+)h)?(?:(\d+)m?)?(?=\s)"#) { m in

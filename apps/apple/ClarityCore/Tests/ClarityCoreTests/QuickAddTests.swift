@@ -93,4 +93,15 @@ import Testing
         #expect(p.title == "Email keivan.sina@gmail.com about trip")
         #expect(p.tags == [])
     }
+
+    @Test func parsesEnergyLevels() {
+        #expect(parseQuickAdd("File taxes ^high", now: now).energy == .high)
+        #expect(parseQuickAdd("Sort photos ^low @home", now: now).energy == .low)
+        #expect(parseQuickAdd("Review notes ^med", now: now).energy == .medium)
+        #expect(parseQuickAdd("Plan sprint ^medium", now: now).energy == .medium)
+        let p = parseQuickAdd("Sort photos ^low", now: now)
+        #expect(p.title == "Sort photos")
+        #expect(parseQuickAdd("Solve 2^high math puzzle", now: now).energy == nil)
+        #expect(parseQuickAdd("No energy here", now: now).energy == nil)
+    }
 }

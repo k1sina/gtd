@@ -6,7 +6,6 @@ import {
   AlarmClockOff,
   CalendarDays,
   Check,
-  FolderPlus,
   Hourglass,
   LayoutList,
   Moon,
@@ -14,21 +13,19 @@ import {
   Zap,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { useCreateTask, useDeleteTask, useUpdateTask } from "@/lib/data";
-import { useSpace } from "@/lib/space-context";
+import { useDeleteTask, useUpdateTask } from "@/lib/data";
 import { PriorityMatrix } from "./priority-matrix";
 import { Button, Input } from "./ui";
 
 /**
  * GTD clarify flow: walk through inbox items one at a time and decide what
  * each one is. The list shrinks as items get clarified. Render with
- * key={task.id} so state resets per item.
+ * key={task.id} so state resets per item. Multi-step item? Send it to Next
+ * and add subtasks in its editor — a task with subtasks IS a project.
  */
 export function ClarifyCard({ task }: { task: Task }) {
-  const { currentSpace } = useSpace();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
-  const createTask = useCreateTask();
 
   const [due, setDue] = useState("");
   const [waitingOn, setWaitingOn] = useState("");
@@ -162,30 +159,14 @@ export function ClarifyCard({ task }: { task: Task }) {
           onWaiting={() => setAskWaiting(true)}
           onSomeday={() => updateTask.mutate({ ...base, status: "someday" })}
           onDefer={() => setAskDefer(true)}
-          onProject={async () => {
-            if (!currentSpace) return;
-            // The captured item becomes the parent (a task with subtasks IS a
-            // project); seed it with a first planning subtask.
-            updateTask.mutate({
-              id: task.id,
-              status: "next",
-              outcome: task.notes,
-            });
-            await createTask.mutateAsync({
-              space_id: currentSpace.id,
-              title: `Define first next action for “${task.title}”`,
-              status: "next",
-              parent_task_id: task.id,
-            });
-          }}
           onTrash={() => deleteTask.mutate(task.id)}
         />
       )}
       <p className="mt-3 text-[11px] text-ink-faint">
         <Check size={10} className="mr-1 inline" />
-        Is it actionable? Under 2 minutes → do it now. Multiple steps → it’s a
-        project. Not yours → waiting for. Not now → someday. Keys 1–6 pick an
-        outcome.
+        Is it actionable? Under 2 minutes → do it now. Multiple steps → make
+        it a next action and add subtasks in its editor. Not yours → waiting
+        for. Not now → someday. Keys 1–5 pick an outcome.
       </p>
     </div>
   );
@@ -207,7 +188,6 @@ function ClarifyActions({
   onWaiting,
   onSomeday,
   onDefer,
-  onProject,
   onTrash,
 }: {
   due: string;
@@ -217,7 +197,6 @@ function ClarifyActions({
   onWaiting: () => void;
   onSomeday: () => void;
   onDefer: () => void;
-  onProject: () => void;
   onTrash: () => void;
 }) {
   // Keep the number-key map in sync with the buttons below. Trash stays
@@ -228,7 +207,6 @@ function ClarifyActions({
     "3": onWaiting,
     "4": onSomeday,
     "5": onDefer,
-    "6": onProject,
   };
 
   return (
@@ -253,13 +231,6 @@ function ClarifyActions({
       </Button>
       <Button size="sm" title="Hide it until a date, then resurface as a next action" onClick={onDefer}>
         <AlarmClockOff size={13} /> Defer… <Kbd>5</Kbd>
-      </Button>
-      <Button
-        size="sm"
-        title="Turn this into a project with its own next actions"
-        onClick={onProject}
-      >
-        <FolderPlus size={13} /> It’s a project <Kbd>6</Kbd>
       </Button>
       <Button variant="danger" size="sm" onClick={onTrash}>
         <Trash2 size={13} /> Trash

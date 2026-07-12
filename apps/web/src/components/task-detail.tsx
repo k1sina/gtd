@@ -9,8 +9,8 @@ import {
   quadrant,
   reorderPatches,
 } from "@gtd/shared";
-import { Plus, Trash2 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Plus, Trash2, X } from "lucide-react";
+import { useId, useMemo, useState } from "react";
 import {
   useAddTaskComment,
   useCreateTask,
@@ -91,6 +91,12 @@ export function TaskDetail({
       (a, b) =>
         a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at)
     );
+
+  // Every tag in the space, for tag-input suggestions.
+  const allTags = useMemo(
+    () => [...new Set(allTasks.flatMap((t) => t.context_tags))].sort(),
+    [allTasks]
+  );
 
   const patch = (fields: Partial<Task>) =>
     updateTask.mutate({ id: live.id, ...fields });
@@ -276,18 +282,31 @@ export function TaskDetail({
             )}
           </label>
 
-          <label className="flex flex-col gap-1 text-xs text-ink-soft">
+          <div className="flex flex-col gap-1 text-xs text-ink-soft">
             Energy
-            <Select
-              value={live.energy ?? ""}
-              onChange={(e) => patch({ energy: (e.target.value || null) as Task["energy"] })}
-            >
-              <option value="">—</option>
-              <option value="low">Low</option>
-              <option value="medium">Medium</option>
-              <option value="high">High</option>
-            </Select>
-          </label>
+            <div className="flex h-9 items-center gap-1">
+              {(["low", "medium", "high"] as const).map((e) => (
+                <button
+                  key={e}
+                  type="button"
+                  title={
+                    live.energy === e ? "Click again to clear" : `${e} energy`
+                  }
+                  onClick={() =>
+                    patch({ energy: live.energy === e ? null : e })
+                  }
+                  className={
+                    "flex-1 rounded-md border px-2 py-1.5 text-xs capitalize cursor-pointer " +
+                    (live.energy === e
+                      ? "border-accent bg-accent-soft font-medium text-accent"
+                      : "border-line text-ink-soft hover:border-accent")
+                  }
+                >
+                  {e}
+                </button>
+              ))}
+            </div>
+          </div>
 
           <label className="flex flex-col gap-1 text-xs text-ink-soft">
             Estimate (minutes)
@@ -304,21 +323,14 @@ export function TaskDetail({
             />
           </label>
 
-          <label className="flex flex-col gap-1 text-xs text-ink-soft">
-            Context tags (comma separated)
-            <Input
-              defaultValue={live.context_tags.join(", ")}
-              onBlur={(e) =>
-                patch({
-                  context_tags: e.target.value
-                    .split(",")
-                    .map((t) => t.trim().toLowerCase())
-                    .filter(Boolean),
-                })
-              }
-              placeholder="phone, home, errands"
+          <div className="col-span-2 flex flex-col gap-1 text-xs text-ink-soft">
+            Context tags
+            <TagEditor
+              tags={live.context_tags}
+              suggestions={allTags}
+              onChange={(context_tags) => patch({ context_tags })}
             />
-          </label>
+          </div>
         </div>
 
         {/* Collapsed by default; a deliberate rating (≠ the 2,2 default) opens it. */}
@@ -441,5 +453,77 @@ export function TaskDetail({
         <TaskDetail key={drill.id} task={drill} onClose={() => setDrill(null)} />
       )}
     </Dialog>
+  );
+}
+
+/**
+ * Tag chips with ✕-to-remove plus an add-input that suggests the space's
+ * existing tags (datalist) — replaces the old comma-separated text field.
+ * Enter or comma commits; Backspace on an empty input removes the last tag.
+ */
+function TagEditor({
+  tags,
+  suggestions,
+  onChange,
+}: {
+  tags: string[];
+  suggestions: string[];
+  onChange: (tags: string[]) => void;
+}) {
+  const [draft, setDraft] = useState("");
+  const listId = useId();
+
+  function add(raw: string) {
+    const tag = raw.trim().toLowerCase().replace(/^@/, "");
+    if (tag && !tags.includes(tag)) onChange([...tags, tag]);
+    setDraft("");
+  }
+
+  return (
+    <div className="flex min-h-9 flex-wrap items-center gap-1.5 rounded-md border border-line bg-surface px-2 py-1.5 focus-within:border-accent">
+      {tags.map((t) => (
+        <span
+          key={t}
+          className="flex items-center gap-1 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent"
+        >
+          @{t}
+          <button
+            type="button"
+            aria-label={`Remove tag ${t}`}
+            onClick={() => onChange(tags.filter((x) => x !== t))}
+            className="cursor-pointer rounded-full hover:bg-accent/20"
+          >
+            <X size={11} />
+          </button>
+        </span>
+      ))}
+      <input
+        list={listId}
+        value={draft}
+        onChange={(e) => {
+          // Selecting a datalist entry fires change with the full value.
+          if (e.target.value.endsWith(",")) add(e.target.value.slice(0, -1));
+          else setDraft(e.target.value);
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && draft.trim()) {
+            e.preventDefault();
+            add(draft);
+          } else if (e.key === "Backspace" && !draft && tags.length > 0) {
+            onChange(tags.slice(0, -1));
+          }
+        }}
+        onBlur={() => draft.trim() && add(draft)}
+        placeholder={tags.length === 0 ? "phone, home, errands…" : "add…"}
+        className="min-w-24 flex-1 bg-transparent text-sm outline-none placeholder:text-ink-faint"
+      />
+      <datalist id={listId}>
+        {suggestions
+          .filter((s) => !tags.includes(s))
+          .map((s) => (
+            <option key={s} value={s} />
+          ))}
+      </datalist>
+    </div>
   );
 }
