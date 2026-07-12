@@ -11,7 +11,8 @@ with a partner.
 - **Capture** — global quick-add (press `N` or `⌘K`) with natural-language
   parsing: `Call mom tomorrow 3pm @phone #Family !urgent ~15m every week`
 - **Clarify** — guided inbox triage: 2-minute rule, next action, waiting-for,
-  someday, convert to project (a task with subtasks IS a project), trash
+  someday, trash (multi-step outcomes are just tasks you add subtasks to —
+  a task with subtasks IS a project)
 - **Organize** — nested subtasks with desired outcomes and stalled detection,
   context tags, energy levels, defer dates; drag-and-drop ordering of next
   actions, someday items, and subtasks on every platform
