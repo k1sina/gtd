@@ -43,18 +43,25 @@ enum AppSection: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Sidebar groups mirroring the web app's navigation.
+    /// Sidebar groups following the GTD loop, mirroring the web sidebar:
+    /// engage first, then capture, then the parked/upcoming lists, then
+    /// reflection. Search sits next to the space switcher up top; Settings
+    /// closes the sidebar. Assistant is hidden for now — the user drives
+    /// Clarity through Claude via MCP instead; add `.assistant` back here
+    /// (and in `browse`) to restore it.
     static let groups: [(title: String?, sections: [AppSection])] = [
-        (nil, [.today, .assistant, .inbox, .next, .scheduled, .waiting, .someday]),
-        ("Organize", [.habits]),
-        ("Horizons", [.reviews, .goals]),
-        ("System", [.search, .settings]),
+        (nil, [.today, .next]),
+        ("Capture", [.inbox]),
+        ("Upcoming & parked", [.scheduled, .waiting, .someday, .habits]),
+        ("Reflect", [.reviews, .goals]),
+        (nil, [.settings]),
     ]
 
     /// iOS: sections that live in the Browse tab rather than the tab bar.
+    /// Search leads — it was buried at the bottom before.
     static let browse: [AppSection] = [
-        .scheduled, .waiting, .someday, .habits,
-        .reviews, .goals, .assistant, .search,
+        .search, .scheduled, .waiting, .someday, .habits,
+        .reviews, .goals,
     ]
 }
 
@@ -79,9 +86,18 @@ struct MainView: View {
             }
             .navigationSplitViewColumnWidth(min: 190, ideal: 210)
             .safeAreaInset(edge: .top) {
-                SpaceSwitcherMenu()
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 6)
+                HStack(spacing: 4) {
+                    SpaceSwitcherMenu()
+                    Button {
+                        section = .search
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Search")
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
             }
         } detail: {
             NavigationStack { sectionView(section) }
