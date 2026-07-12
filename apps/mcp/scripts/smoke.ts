@@ -18,7 +18,6 @@ const EXPECTED_TOOLS = [
   "create_task",
   "update_task",
   "complete_task",
-  "plan_day",
 ];
 
 function fail(message: string): never {

@@ -9,17 +9,9 @@ import {
   isDeferred,
   isStalledParent,
   nextOccurrenceInsert,
-  planDay,
   priorityScore,
   quadrant,
-  type Interval,
 } from "@gtd/shared";
-import {
-  getCalendarAccount,
-  getValidAccessToken,
-  plannerConfig,
-} from "./calendar-account";
-import { GoogleReauthRequiredError, listEvents } from "./google";
 
 export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
   {
@@ -125,12 +117,6 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
       properties: { task_id: { type: "string" } },
       required: ["task_id"],
     },
-  },
-  {
-    name: "plan_day",
-    description:
-      "Propose focus time blocks for today: fits the user's top-priority open tasks into free slots of their working day around calendar events. Returns the proposed blocks; the user confirms them in the Today view.",
-    input_schema: { type: "object", properties: {}, required: [] },
   },
 ];
 
@@ -296,86 +282,6 @@ async function completeTask(ctx: ToolContext, input: ToolInput) {
   return { completed: task.title, next_occurrence: insert?.due_at ?? null };
 }
 
-async function planToday(ctx: ToolContext) {
-  const now = new Date();
-  const dayStart = new Date(now);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-
-  const account = await getCalendarAccount(ctx.supabase);
-  const config = plannerConfig(account);
-
-  const busy: Interval[] = [];
-  let calendarNote: string | null = null;
-  if (account) {
-    try {
-      const token = await getValidAccessToken(ctx.supabase, account);
-      const events = await listEvents(token, account.calendar_id, dayStart, dayEnd);
-      for (const e of events) {
-        if (e.transparency === "transparent") continue;
-        if (e.start?.dateTime && e.end?.dateTime) {
-          busy.push({ start: new Date(e.start.dateTime), end: new Date(e.end.dateTime) });
-        }
-      }
-    } catch (err) {
-      calendarNote =
-        err instanceof GoogleReauthRequiredError
-          ? "Google Calendar connection expired — tell the user to reconnect it in Settings. Planned without calendar events."
-          : "Calendar fetch failed — planned without calendar events.";
-    }
-  }
-
-  const { data: tasks } = await ctx.supabase
-    .from("tasks")
-    .select("id, title, urgency, importance, due_at, defer_until, estimated_minutes, parent_task_id")
-    .eq("space_id", ctx.spaceId)
-    .in("status", ["next", "scheduled"]);
-
-  const candidates = (tasks ?? [])
-    .filter((t) => !t.parent_task_id && !isDeferred(t, now))
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      urgency: t.urgency,
-      importance: t.importance,
-      due_at: t.due_at,
-      estimated_minutes: t.estimated_minutes,
-    }));
-
-  const blocks = planDay(candidates, busy, dayStart, config, now);
-
-  // Store as suggestions so the Today view shows them for confirmation.
-  await ctx.supabase
-    .from("time_blocks")
-    .delete()
-    .eq("status", "suggested")
-    .gte("starts_at", dayStart.toISOString())
-    .lt("starts_at", dayEnd.toISOString());
-  if (blocks.length > 0) {
-    await ctx.supabase.from("time_blocks").insert(
-      blocks.map((b) => ({
-        user_id: ctx.userId,
-        task_id: b.taskId,
-        starts_at: b.start.toISOString(),
-        ends_at: b.end.toISOString(),
-        status: "suggested",
-      }))
-    );
-  }
-
-  return {
-    calendar_connected: !!account,
-    ...(calendarNote ? { calendar_note: calendarNote } : {}),
-    proposed_blocks: blocks.map((b) => ({
-      task: b.title,
-      start: b.start.toISOString(),
-      end: b.end.toISOString(),
-    })),
-    note: "Blocks are saved as suggestions — the user confirms them on the Today view.",
-  };
-}
-
 export async function executeAssistantTool(
   name: string,
   input: ToolInput,
@@ -390,8 +296,6 @@ export async function executeAssistantTool(
       return updateTask(ctx, input);
     case "complete_task":
       return completeTask(ctx, input);
-    case "plan_day":
-      return planToday(ctx);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

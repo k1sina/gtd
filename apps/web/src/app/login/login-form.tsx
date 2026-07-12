@@ -14,7 +14,7 @@ export default function LoginForm() {
   const destination =
     nextPath && nextPath.startsWith("/") && !nextPath.startsWith("//")
       ? nextPath
-      : "/today";
+      : "/next";
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

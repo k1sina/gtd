@@ -15,9 +15,9 @@ with a partner.
 - **Organize** — nested subtasks with desired outcomes and stalled detection,
   context tags, energy levels, defer dates; drag-and-drop ordering of next
   actions, someday items, and subtasks on every platform
-- **Engage** — Today view and Next Actions (filter by context/energy) that
-  surface each project's next actionable subtask; optional Eisenhower
-  urgency × importance rating per task
+- **Engage** — a single Next Actions list (filter by context/energy, drag
+  into your own order) that surfaces each project's next actionable
+  subtask; optional Eisenhower urgency × importance rating per task
 - **Recurrence & habits** — repeating tasks (RRULE subset) that respawn on
   completion; habit tracker with weekly grid and streaks
 - **Review** — guided weekly review wizard (inbox zero → calendar → stalled
@@ -32,7 +32,7 @@ with a partner.
 - `apps/apple` — SwiftUI apps for iPhone, Mac, and Apple Watch plus Siri
   App Intents (XcodeGen project; see `apps/apple/README.md`)
 - `apps/mcp` — MCP stdio server: lets Claude apps command your GTD data
-  with the same 5 tools as the built-in assistant (see `.mcp.json`)
+  with the same 4 tools as the built-in assistant (see `.mcp.json`)
 - `packages/shared` — dependency-free domain logic (priority scoring,
   recurrence engine, NL parser) with Vitest tests; mirrored in Swift as
   `apps/apple/ClarityCore`
@@ -58,8 +58,8 @@ npm test                  # unit tests for packages/shared
 | --- | --- | --- |
 | 0–1 | Monorepo, schema/RLS, auth, core GTD (capture → engage) | ✅ done |
 | 2 | Weekly/quarterly reviews, values & goals | ✅ done |
-| 3 | Google Calendar integration + automated time-blocking | ✅ done |
-| 4 | AI assistant (Claude tool-use: command the app, plan my week, review copilot) | ✅ done |
+| 3 | Google Calendar integration + automated time-blocking | ⛔ removed (no Today view — engage happens from Next Actions) |
+| 4 | AI assistant (Claude tool-use: command the app, review copilot) | ✅ done |
 | 5 | Collaboration: shared spaces, invites, assignments, comments, realtime | ✅ done |
 | 6 | Apple platforms: iPhone/Mac/Watch apps, Siri App Intents | ✅ done (widgets pending) |
 | 7 | MCP server: command Clarity from Claude apps | ✅ done |

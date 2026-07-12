@@ -20,9 +20,8 @@ import {
 import { useSpace } from "@/lib/space-context";
 
 const QUICK_PROMPTS = [
-  "What should I focus on today?",
+  "What should I focus on right now?",
   "Prioritise my inbox — suggest urgency and importance for each item",
-  "Plan focus blocks for my day",
   "Which tasks are stalled without a next action?",
   "Help me prepare my weekly review",
 ];
@@ -32,7 +31,6 @@ const TOOL_LABELS: Record<string, string> = {
   create_task: "Creating task",
   update_task: "Updating task",
   complete_task: "Completing task",
-  plan_day: "Planning the day",
 };
 
 interface ContentBlock {

@@ -47,7 +47,7 @@ export default function InvitePage({
       setState("done");
       setMessage("You're in! Taking you to the shared space…");
       setTimeout(() => {
-        router.replace("/today");
+        router.replace("/next");
         router.refresh();
       }, 900);
     })();
@@ -62,7 +62,7 @@ export default function InvitePage({
       {state === "error" && <XCircle size={28} className="text-red-500" />}
       <p className="text-sm text-ink-soft">{message}</p>
       {state === "error" && (
-        <Button onClick={() => router.push("/today")}>Go to the app</Button>
+        <Button onClick={() => router.push("/next")}>Go to the app</Button>
       )}
     </main>
   );

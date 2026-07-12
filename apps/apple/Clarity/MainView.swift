@@ -2,7 +2,7 @@ import ClarityKit
 import SwiftUI
 
 enum AppSection: String, CaseIterable, Identifiable {
-    case today, assistant, inbox, next, scheduled, waiting, someday
+    case assistant, inbox, next, scheduled, waiting, someday
     case habits
     case reviews, goals
     case search, settings
@@ -11,7 +11,6 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .today: return "Today"
         case .assistant: return "Assistant"
         case .inbox: return "Inbox"
         case .next: return "Next actions"
@@ -28,7 +27,6 @@ enum AppSection: String, CaseIterable, Identifiable {
 
     var systemImage: String {
         switch self {
-        case .today: return "sun.max"
         case .assistant: return "sparkles"
         case .inbox: return "tray"
         case .next: return "arrow.right.circle"
@@ -50,7 +48,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     /// Clarity through Claude via MCP instead; add `.assistant` back here
     /// (and in `browse`) to restore it.
     static let groups: [(title: String?, sections: [AppSection])] = [
-        (nil, [.today, .next]),
+        (nil, [.next]),
         ("Capture", [.inbox]),
         ("Upcoming & parked", [.scheduled, .waiting, .someday, .habits]),
         ("Reflect", [.reviews, .goals]),
@@ -67,7 +65,7 @@ enum AppSection: String, CaseIterable, Identifiable {
 
 struct MainView: View {
     @Environment(AppSession.self) private var session
-    @State private var section: AppSection = .today
+    @State private var section: AppSection = .next
     @State private var inboxCount = 0
 
     var body: some View {
@@ -107,9 +105,8 @@ struct MainView: View {
         .task(id: session.reloadKey) { await refreshInboxCount() }
         #else
         TabView(selection: $section) {
-            tab(.today)
-            tab(.inbox)
             tab(.next)
+            tab(.inbox)
             NavigationStack { BrowseView() }
                 .tabItem { Label("Browse", systemImage: "square.grid.2x2") }
                 .tag(AppSection.search) // any non-tab section selects Browse
@@ -122,7 +119,7 @@ struct MainView: View {
 
     #if os(macOS)
     private var sidebarSelection: Binding<AppSection?> {
-        Binding(get: { section }, set: { section = $0 ?? .today })
+        Binding(get: { section }, set: { section = $0 ?? .next })
     }
 
     private func refreshInboxCount() async {
@@ -143,7 +140,6 @@ struct MainView: View {
 @ViewBuilder
 func sectionView(_ section: AppSection) -> some View {
     switch section {
-    case .today: TodayView()
     case .assistant: AssistantView()
     case .inbox: InboxView()
     case .next: NextView()

@@ -101,25 +101,7 @@ import Testing
         #expect(review.completedAt == nil)
     }
 
-    @Test func decodesTimeBlock() throws {
-        let json = """
-            {
-              "id": "6f1b2a34-0000-4000-8000-000000000050",
-              "user_id": "6f1b2a34-0000-4000-8000-000000000003",
-              "task_id": "6f1b2a34-0000-4000-8000-000000000001",
-              "calendar_event_id": null,
-              "starts_at": "2026-07-07T09:00:00+00:00",
-              "ends_at": "2026-07-07T09:45:00+00:00",
-              "status": "suggested",
-              "created_at": "2026-07-07T08:00:00+00:00"
-            }
-            """.data(using: .utf8)!
-        let block = try PostgrestJSON.decoder.decode(TimeBlock.self, from: json)
-        #expect(block.status == .suggested)
-        #expect(block.endsAt > block.startsAt)
-    }
-
-    @Test func decodesInviteProfileAndComment() throws {
+        @Test func decodesInviteProfileAndComment() throws {
         let inviteJSON = """
             {"id": "6f1b2a34-0000-4000-8000-000000000060",
              "space_id": "6f1b2a34-0000-4000-8000-000000000002",

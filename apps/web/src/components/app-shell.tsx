@@ -17,7 +17,6 @@ import {
   RefreshCcw,
   Search,
   Settings,
-  Sun,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
@@ -28,7 +27,7 @@ import { createClient } from "@/lib/supabase/client";
 import { QuickAdd } from "./quick-add";
 import { Button, Dialog, Input } from "./ui";
 
-// Sidebar groups follow the GTD loop: engage first (you live in Today/Next),
+// Sidebar groups follow the GTD loop: engage first (you live in Next),
 // then capture, then the parked/upcoming lists, then reflection. Search and
 // Settings live outside the nav (top action / footer). Assistant is hidden
 // for now — the user drives Clarity through Claude via MCP instead; the
@@ -39,15 +38,12 @@ const NAV_GROUPS: {
   items: {
     href: string;
     label: string;
-    icon: typeof Sun;
+    icon: typeof LayoutList;
     badge?: "inbox";
   }[];
 }[] = [
   {
-    items: [
-      { href: "/today", label: "Today", icon: Sun },
-      { href: "/next", label: "Next actions", icon: LayoutList },
-    ],
+    items: [{ href: "/next", label: "Next actions", icon: LayoutList }],
   },
   {
     label: "Capture",
@@ -265,8 +261,7 @@ export function AppShell({
                   href={item.href}
                   className={clsx(
                     "flex items-center gap-2.5 rounded-md px-2.5 py-1.5 text-sm",
-                    pathname === item.href ||
-                      (item.href !== "/today" && pathname.startsWith(item.href))
+                    pathname.startsWith(item.href)
                       ? "bg-accent-soft font-medium text-accent"
                       : "text-ink-soft hover:bg-canvas hover:text-ink"
                   )}
