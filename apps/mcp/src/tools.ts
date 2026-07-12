@@ -1,17 +1,12 @@
 // Tool executors — ports of apps/web/src/lib/assistant-tools.ts (same names,
-// same behavior) minus the web-only Google Calendar integration. Keep the two
-// implementations in sync.
+// same behavior). Keep the two implementations in sync.
 
 import {
-  DEFAULT_PLANNER_CONFIG,
   isDeferred,
   isStalledParent,
   nextOccurrenceInsert,
-  planDay,
   priorityScore,
   quadrant,
-  type Interval,
-  type PlannerConfig,
 } from "@gtd/shared";
 import type { ToolContext } from "./auth.js";
 
@@ -206,89 +201,6 @@ async function completeTask(ctx: ToolContext, input: ToolInput) {
   return { completed: task.title, next_occurrence: insert?.due_at ?? null };
 }
 
-async function planToday(ctx: ToolContext) {
-  const now = new Date();
-  const dayStart = new Date(now);
-  dayStart.setHours(0, 0, 0, 0);
-  const dayEnd = new Date(dayStart);
-  dayEnd.setDate(dayEnd.getDate() + 1);
-
-  // Planner settings live on the user's calendar account row (if any).
-  const { data: accounts } = await ctx.supabase
-    .from("calendar_accounts")
-    .select("settings")
-    .eq("user_id", ctx.userId)
-    .limit(1);
-  const config: PlannerConfig = {
-    ...DEFAULT_PLANNER_CONFIG,
-    ...((accounts?.[0]?.settings as Partial<PlannerConfig> | undefined) ?? {}),
-  };
-
-  // No direct Google access from here (the OAuth tokens are managed by the
-  // web app) — treat already-confirmed/synced blocks for today as busy.
-  const { data: existing } = await ctx.supabase
-    .from("time_blocks")
-    .select("starts_at, ends_at")
-    .eq("user_id", ctx.userId)
-    .in("status", ["confirmed", "synced"])
-    .gte("starts_at", dayStart.toISOString())
-    .lt("starts_at", dayEnd.toISOString());
-  const busy: Interval[] = (existing ?? []).map((b) => ({
-    start: new Date(b.starts_at),
-    end: new Date(b.ends_at),
-  }));
-
-  const { data: tasks } = await ctx.supabase
-    .from("tasks")
-    .select(
-      "id, title, urgency, importance, due_at, defer_until, estimated_minutes, parent_task_id"
-    )
-    .eq("space_id", ctx.spaceId)
-    .in("status", ["next", "scheduled"]);
-
-  const candidates = (tasks ?? [])
-    .filter((t) => !t.parent_task_id && !isDeferred(t, now))
-    .map((t) => ({
-      id: t.id,
-      title: t.title,
-      urgency: t.urgency,
-      importance: t.importance,
-      due_at: t.due_at,
-      estimated_minutes: t.estimated_minutes,
-    }));
-
-  const blocks = planDay(candidates, busy, dayStart, config, now);
-
-  // Store as suggestions so the Today view shows them for confirmation.
-  await ctx.supabase
-    .from("time_blocks")
-    .delete()
-    .eq("status", "suggested")
-    .gte("starts_at", dayStart.toISOString())
-    .lt("starts_at", dayEnd.toISOString());
-  if (blocks.length > 0) {
-    await ctx.supabase.from("time_blocks").insert(
-      blocks.map((b) => ({
-        user_id: ctx.userId,
-        task_id: b.taskId,
-        starts_at: b.start.toISOString(),
-        ends_at: b.end.toISOString(),
-        status: "suggested",
-      }))
-    );
-  }
-
-  return {
-    calendar_connected: false,
-    proposed_blocks: blocks.map((b) => ({
-      task: b.title,
-      start: b.start.toISOString(),
-      end: b.end.toISOString(),
-    })),
-    note: "Blocks are saved as suggestions — confirm them on the web app's Today view. Busy time comes from already-confirmed blocks, not live calendar events.",
-  };
-}
-
 export async function executeTool(
   name: string,
   input: ToolInput,
@@ -303,8 +215,6 @@ export async function executeTool(
       return updateTask(ctx, input);
     case "complete_task":
       return completeTask(ctx, input);
-    case "plan_day":
-      return planToday(ctx);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

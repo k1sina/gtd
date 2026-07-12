@@ -553,180 +553,6 @@ export function useSaveReview() {
 }
 
 // ---------------------------------------------------------------------------
-// Calendar & time-blocking
-// ---------------------------------------------------------------------------
-
-export interface CalendarEventView {
-  id: string;
-  summary: string;
-  start: string | null;
-  end: string | null;
-  allDay: boolean;
-  busy: boolean;
-}
-
-export function useCalendarEvents(dateKey: string) {
-  return useQuery({
-    queryKey: ["calendar_events", dateKey],
-    staleTime: 60_000,
-    queryFn: async (): Promise<{
-      connected: boolean;
-      events: CalendarEventView[];
-      reauthRequired?: boolean;
-    }> => {
-      const res = await fetch(`/api/calendar/events?date=${dateKey}`);
-      const body = await res.json().catch(() => null);
-      if (!res.ok) {
-        return {
-          connected: true,
-          events: [],
-          reauthRequired: body?.error === "google_reauth_required",
-        };
-      }
-      return body;
-    },
-  });
-}
-
-export interface TimeBlockRow {
-  id: string;
-  task_id: string | null;
-  starts_at: string;
-  ends_at: string;
-  status: "suggested" | "confirmed" | "synced" | "cancelled";
-  calendar_event_id: string | null;
-}
-
-export function useTimeBlocks(dateKey: string) {
-  const supabase = createClient();
-  return useQuery({
-    queryKey: ["time_blocks", dateKey],
-    queryFn: async (): Promise<TimeBlockRow[]> => {
-      const start = new Date(`${dateKey}T00:00:00`);
-      const end = new Date(start);
-      end.setDate(end.getDate() + 1);
-      const { data, error } = await supabase
-        .from("time_blocks")
-        .select("*")
-        .gte("starts_at", start.toISOString())
-        .lt("starts_at", end.toISOString())
-        .neq("status", "cancelled")
-        .order("starts_at");
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function usePlanDay() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({ spaceId, dateKey }: { spaceId: string; dateKey: string }) => {
-      const res = await fetch("/api/plan", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ spaceId, date: dateKey }),
-      });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Planning failed");
-      return res.json();
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["time_blocks"] }),
-  });
-}
-
-export function useConfirmPlan() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (blockIds: string[]) => {
-      const res = await fetch("/api/plan/confirm", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ blockIds }),
-      });
-      if (!res.ok) throw new Error("Confirm failed");
-      return res.json();
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["time_blocks"] });
-      qc.invalidateQueries({ queryKey: ["calendar_events"] });
-    },
-  });
-}
-
-export function useDismissPlan() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (dateKey: string) => {
-      await fetch("/api/plan/dismiss", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date: dateKey }),
-      });
-    },
-    onSettled: () => qc.invalidateQueries({ queryKey: ["time_blocks"] }),
-  });
-}
-
-export interface CalendarAccountRow {
-  id: string;
-  email: string;
-  calendar_id: string;
-  settings: Record<string, unknown>;
-}
-
-export function useCalendarAccount() {
-  const supabase = createClient();
-  return useQuery({
-    queryKey: ["calendar_account"],
-    queryFn: async (): Promise<CalendarAccountRow | null> => {
-      const { data, error } = await supabase
-        .from("calendar_accounts")
-        .select("id, email, calendar_id, settings")
-        .eq("provider", "google")
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-}
-
-export function useUpdateCalendarAccount() {
-  const supabase = createClient();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async ({
-      id,
-      ...patch
-    }: { id: string; calendar_id?: string; settings?: Record<string, unknown> }) => {
-      const { error } = await supabase
-        .from("calendar_accounts")
-        .update(patch)
-        .eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["calendar_account"] });
-      qc.invalidateQueries({ queryKey: ["calendar_events"] });
-    },
-  });
-}
-
-export function useDisconnectCalendar() {
-  const supabase = createClient();
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("calendar_accounts").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSettled: () => {
-      qc.invalidateQueries({ queryKey: ["calendar_account"] });
-      qc.invalidateQueries({ queryKey: ["calendar_events"] });
-    },
-  });
-}
-
-// ---------------------------------------------------------------------------
 // Collaboration: spaces, members, invites, comments
 // ---------------------------------------------------------------------------
 
@@ -972,9 +798,8 @@ export function useSendChatMessage() {
     onSettled: (_data, _err, vars) => {
       qc.invalidateQueries({ queryKey: ["chat_sessions"] });
       qc.invalidateQueries({ queryKey: ["chat_messages"] });
-      // The assistant may have changed tasks/blocks.
+      // The assistant may have changed tasks.
       qc.invalidateQueries({ queryKey: ["tasks"] });
-      qc.invalidateQueries({ queryKey: ["time_blocks"] });
       void vars;
     },
   });
@@ -1017,17 +842,11 @@ export function useSearch(spaceId: string | undefined, term: string) {
 }
 
 // ---------------------------------------------------------------------------
-// Integration settings (Settings page: Anthropic key, Google OAuth client)
+// Integration settings (Settings page: Anthropic key)
 // ---------------------------------------------------------------------------
 
 export interface IntegrationStatus {
   anthropic: { configured: boolean; source: "settings" | "env" | null };
-  google: {
-    configured: boolean;
-    source: "settings" | "env" | null;
-    client_id: string | null;
-    redirect_uri: string;
-  };
 }
 
 export function useIntegrationStatus() {
@@ -1043,8 +862,6 @@ export function useIntegrationStatus() {
 
 export interface UserSettingsPatch {
   anthropic_api_key?: string | null;
-  google_client_id?: string | null;
-  google_client_secret?: string | null;
 }
 
 export function useSaveUserSettings() {

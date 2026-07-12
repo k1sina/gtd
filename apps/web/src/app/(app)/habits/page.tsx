@@ -3,7 +3,7 @@
 import clsx from "clsx";
 import { Flame, Plus, RefreshCcw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { habitDueOn, habitStreak } from "@/components/habit-strip";
+import { habitDueOn, habitStreak } from "@/lib/habits";
 import { PageHeader } from "@/components/task-list";
 import { Button, Dialog, EmptyState, Input } from "@/components/ui";
 import {

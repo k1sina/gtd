@@ -108,9 +108,9 @@ export default function WeeklyReviewPage() {
         <p className="max-w-sm text-sm text-ink-soft">
           Your system is current. Trust it, and get back to doing.
         </p>
-        <Link href="/today">
+        <Link href="/next">
           <Button variant="primary" className="mt-2">
-            Go to Today
+            Go to Next actions
           </Button>
         </Link>
       </div>

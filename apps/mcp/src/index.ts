@@ -138,15 +138,5 @@ server.registerTool(
   handler("complete_task")
 );
 
-server.registerTool(
-  "plan_day",
-  {
-    description:
-      "Propose focus time blocks for today: fits the user's top-priority open tasks into free slots of their working day. Busy time comes from already-confirmed time blocks (no direct calendar access from this server). Returns the proposed blocks; the user confirms them in the web app's Today view.",
-    inputSchema: {},
-  },
-  handler("plan_day")
-);
-
 const transport = new StdioServerTransport();
 await server.connect(transport);

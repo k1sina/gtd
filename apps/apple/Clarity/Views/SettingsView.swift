@@ -3,8 +3,7 @@ import ClarityKit
 import SwiftUI
 
 /// Account, space, and (in shared spaces) sharing management — mirrors the
-/// web settings page. Calendar & planning preferences live in
-/// PlannerSettingsSection once the web API is configured.
+/// web settings page.
 struct SettingsView: View {
     @Environment(AppSession.self) private var session
     @State private var showJoin = false
@@ -41,8 +40,6 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
-
-            PlannerSettingsSection()
 
             Section("Data") {
                 Button("Import from Apple Reminders…") { showRemindersImport = true }

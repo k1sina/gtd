@@ -11,7 +11,7 @@ struct WatchRootView: View {
                 ProgressView()
             } else if session.isSignedIn {
                 TabView {
-                    WatchTodayView()
+                    WatchNextView()
                     WatchCaptureView()
                     WatchHabitsView()
                 }

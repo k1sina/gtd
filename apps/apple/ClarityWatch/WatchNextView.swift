@@ -2,26 +2,22 @@ import ClarityCore
 import ClarityKit
 import SwiftUI
 
-/// Due/overdue plus top next actions; tap the circle to complete (recurring
-/// tasks spawn their next occurrence, same as everywhere else), tap the row
-/// to adjust priority on the matrix.
-struct WatchTodayView: View {
+/// Next actions in the user's manual order (unplaced tasks rank by
+/// leverage) — the watch's main screen. Tap the circle to complete
+/// (recurring tasks spawn their next occurrence, same as everywhere else),
+/// tap the row to adjust priority on the matrix.
+struct WatchNextView: View {
     @Environment(AppSession.self) private var session
     @State private var tasks: [TaskItem] = []
     @State private var loading = true
     @State private var error: String?
     @State private var editing: TaskItem?
 
-    private var agenda: [TaskItem] {
-        let endOfDay = Calendar.current.startOfDay(for: .now).addingTimeInterval(86_400)
-        let due = tasks
-            .filter { $0.dueAt.map { $0 < endOfDay } ?? false }
-        let dueIds = Set(due.map(\.id))
-        let top = tasks
-            .filter { $0.status == .next && !dueIds.contains($0.id) && !isDeferred($0) }
-        return (due + top)
-            .sorted { priorityScore($0) > priorityScore($1) }
-            .prefix(10)
+    private var nextActions: [TaskItem] {
+        tasks
+            .filter { $0.status == .next && !isDeferred($0) }
+            .sorted(by: userOrder())
+            .prefix(15)
             .map { $0 }
     }
 
@@ -31,11 +27,11 @@ struct WatchTodayView: View {
                 if let error {
                     Text(error).font(.footnote).foregroundStyle(.red)
                 }
-                if agenda.isEmpty && !loading {
-                    Text("All clear for today.")
+                if nextActions.isEmpty && !loading {
+                    Text("No next actions — capture something or clarify your inbox.")
                         .foregroundStyle(.secondary)
                 }
-                ForEach(agenda) { task in
+                ForEach(nextActions) { task in
                     Button {
                         editing = task
                     } label: {
@@ -60,7 +56,7 @@ struct WatchTodayView: View {
                     }
                 }
             }
-            .navigationTitle("Today")
+            .navigationTitle("Next")
             .task { await load() }
             .refreshable { await load() }
             .sheet(item: $editing) { task in
@@ -72,7 +68,7 @@ struct WatchTodayView: View {
     private func load() async {
         do {
             let ctx = try session.requireContext()
-            tasks = try await TaskRepository(ctx).tasks(statuses: [.next, .scheduled, .inbox])
+            tasks = try await TaskRepository(ctx).tasks(statuses: [.next])
             error = nil
         } catch {
             self.error = error.localizedDescription

@@ -114,34 +114,13 @@ xcodebuild -project Clarity.xcodeproj -scheme ClarityWatch \
 Sign in with your Clarity account (created on the web). The session persists
 in the keychain; you won't be asked again.
 
-The iPhone app has five tabs — **Today, Inbox, Next, Browse, Settings** —
+The iPhone app has four tabs — **Next, Inbox, Browse, Settings** —
 where Browse holds everything else (Search first, then Scheduled, Waiting,
 Someday, Habits, Reviews, Goals). The Mac app shows all sections in a
-GTD-grouped sidebar (Today/Next → Capture → Upcoming & parked → Reflect),
+GTD-grouped sidebar (Next → Capture → Upcoming & parked → Reflect),
 with the **space switcher** and a search button at the top (switch spaces,
 create a shared space, or join one from a pasted invite link; on iPhone the
 switcher is in each tab's toolbar).
-
-### Today
-- **Due & overdue** — everything dated before end of today, ranked by
-  priority (importance beats urgency; overdue items get a boost).
-- **Top priorities** — the 5 highest-leverage next actions that aren't
-  already listed above (deferred tasks are excluded). A task with subtasks
-  shows its first actionable subtask as the action line (parent title above
-  it, in small type); the circle completes the subtask, tapping opens the
-  parent. A red **stalled** label means no subtask is an actionable next
-  step.
-- **Habit strip** — today's due habits as tappable chips (with 🔥 streaks).
-- **Schedule** — calendar events + focus blocks; **Plan my day** asks the
-  server to propose blocks, then Confirm (syncs to Google Calendar when
-  connected on the web) or Dismiss.
-- **Completed today** — what you already finished; tap the circle to
-  un-complete.
-- The capture field at the top accepts natural language — see the table
-  below.
-- Tap the circle to **complete** a task. Completing a repeating task
-  automatically schedules its next occurrence — pull to refresh and you'll
-  see the new one.
 
 ### Inbox
 - Raw captures land here. Clarify with swipes:
@@ -161,7 +140,14 @@ switcher is in each tab's toolbar).
   dimmed until their defer date.
 - Drag rows to reorder (long-press on iPhone, or tap **Edit** for handles;
   plain drag on Mac). Reordering is disabled while filters are active.
+- A task with subtasks shows its first actionable subtask as the action
+  line (parent title above it, in small type); the circle completes the
+  subtask, tapping opens the parent. A red **stalled** label means no
+  subtask is an actionable next step.
 - Filter chips narrow by `@context` tag and energy level.
+- Tap the circle to **complete** a task. Completing a repeating task
+  automatically schedules its next occurrence — pull to refresh and you'll
+  see the new one.
 
 ### Scheduled / Waiting / Someday (Browse tab on iPhone)
 - **Scheduled** groups date-bound + deferred tasks: Overdue, Today, Next
@@ -176,7 +162,7 @@ switcher is in each tab's toolbar).
   **outcome** ("what does done look like?"), and watch for the red
   **stalled** label in lists when no subtask is an actionable next step.
   Drag subtasks to reorder them — the first actionable one is what
-  surfaces as the parent's action line in Today/Next.
+  surfaces as the parent's action line on Next.
 
 ### Habits, Reviews, Goals, Assistant, Search
 - **Priority** — the Eisenhower matrix lives in the task editor as a
@@ -250,8 +236,9 @@ tags, subtasks, and — once a task has subtasks — its outcome line.
 
 Three swipeable pages (sign in once; keychain keeps the session):
 
-1. **Today** — due/overdue plus top next actions. Tap a row to complete it
-   (recurring tasks reschedule themselves, same as everywhere).
+1. **Next** — your next actions in manual order (unplaced tasks rank by
+   leverage). Tap a row to complete it (recurring tasks reschedule
+   themselves, same as everywhere).
 2. **Capture** — tap the text field and dictate (or scribble). The text goes
    through the same quick-add parser: "groceries tomorrow at six pm" works.
 3. **Habits** — habits scheduled for today (weekday-aware); tap to log or
@@ -284,7 +271,7 @@ A 10-minute pass that exercises every moving part:
 2. Build & run **Clarity-macOS**; sign in.
 3. Capture `Water plants every 3 days ~10m @home` → appears in **Inbox**
    with a repeat icon and the parse chips shown beforehand.
-4. Swipe/edit it to **Next**, then complete it on the **Today** tab → pull
+4. Swipe/edit it to **Next**, then complete it on the **Next** tab → pull
    to refresh → a new "Water plants" appears, due 3 days out. (This is the
    recurrence engine + completion side effect working end to end.)
 5. Open the **web app** → the same tasks are there (same backend, RLS-scoped
@@ -292,7 +279,7 @@ A 10-minute pass that exercises every moving part:
 6. Run **Clarity-iOS** in a simulator, sign in → same data. Create a project
    `Trip`, then capture `book hotel #Trip friday !important` → lands inside
    *Trip*, due Friday, importance 4.
-7. Run **ClarityWatch** in a simulator → Today shows the same list; tap to
+7. Run **ClarityWatch** in a simulator → Next shows the same list; tap to
    complete something and confirm it disappears from the other platforms
    after a refresh.
 8. On a real iPhone: say "Add a task to Clarity", answer with something
@@ -305,9 +292,9 @@ A 10-minute pass that exercises every moving part:
    it from both sides.
 10. **Reviews:** run the weekly review two steps in, quit the app, reopen —
     it resumes on step 3 (checklist persists per period).
-11. **Assistant & planner** (needs `ANTHROPIC_API_KEY` on the web
-    deployment): ask "what should I focus on today?" and watch the tool
-    captions; on Today press **Plan my day** and confirm a block.
+11. **Assistant** (needs `ANTHROPIC_API_KEY` on the web deployment; the
+    section is currently hidden from navigation): ask "what should I focus
+    on right now?" and watch the tool captions.
 
 ## 9. Troubleshooting
 

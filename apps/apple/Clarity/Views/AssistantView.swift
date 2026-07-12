@@ -14,10 +14,9 @@ struct AssistantView: View {
     @State private var error: String?
 
     private static let quickPrompts = [
-        "What should I focus on today?",
+        "What should I focus on right now?",
         "Prioritise my inbox",
         "Any stalled tasks?",
-        "Plan my day",
     ]
 
     var body: some View {
@@ -156,7 +155,6 @@ struct AssistantView: View {
         case "create_task": return "Created a task"
         case "update_task": return "Updated a task"
         case "complete_task": return "Completed a task"
-        case "plan_day": return "Planned your day"
         default: return name
         }
     }

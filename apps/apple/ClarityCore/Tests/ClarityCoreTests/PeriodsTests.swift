@@ -151,26 +151,3 @@ import Testing
         #expect(message.toolNames == ["list_tasks"])
     }
 }
-
-@Suite struct PlannerConfigTests {
-    @Test func partialSettingsMergeOntoDefaults() throws {
-        let json = """
-            {"workStart": "08:00", "maxBlocks": 4}
-            """.data(using: .utf8)!
-        let config = try JSONDecoder().decode(PlannerConfig.self, from: json)
-        #expect(config.workStart == "08:00")
-        #expect(config.maxBlocks == 4)
-        #expect(config.workEnd == "17:00")
-        #expect(config.defaultBlockMinutes == 45)
-        #expect(config.bufferMinutes == 10)
-        #expect(config.maxBlockMinutes == 120)
-    }
-
-    @Test func encodesCamelCaseKeys() throws {
-        let data = try JSONEncoder().encode(PlannerConfig.default)
-        let object = try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
-        #expect(object["workStart"] as? String == "09:00")
-        #expect(object["defaultBlockMinutes"] as? Int == 45)
-        #expect(object.keys.contains("work_start") == false)
-    }
-}

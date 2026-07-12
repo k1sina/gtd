@@ -126,16 +126,4 @@ import Testing
         #expect(comment.profile.displayName == "Me")
     }
 
-    @Test func decodesCalendarAccountWithPartialSettings() throws {
-        let json = """
-            {"id": "6f1b2a34-0000-4000-8000-000000000090",
-             "provider": "google",
-             "email": "me@example.com",
-             "calendar_id": "primary",
-             "settings": {"workStart": "10:00"}}
-            """.data(using: .utf8)!
-        let account = try PostgrestJSON.decoder.decode(CalendarAccountInfo.self, from: json)
-        #expect(account.settings.workStart == "10:00")
-        #expect(account.settings.maxBlocks == 6)
     }
-}

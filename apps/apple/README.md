@@ -21,21 +21,20 @@ generated from `project.yml` — never edit `Clarity.xcodeproj` by hand.
   round-trip, the multi-space `AppSession` (shared with App Intents,
   includes realtime change subscriptions), typed repositories, and
   `ClarityAPI` — the client for the deployed web app's API routes
-  (assistant chat, day planner, calendar), authenticated with the Supabase
+  (assistant chat), authenticated with the Supabase
   access token as a Bearer header. `TaskRepository.complete` mirrors the
   web's `useCompleteTask`, including spawning the next recurring occurrence.
 - `Clarity/` — iOS + macOS app sources (one source set, two targets), at
-  feature parity with the web app: Today (habit strip, day planner,
-  completed today), Inbox + guided clarify flow, Next (context/energy
-  filters), Scheduled, Waiting-for, Someday, nested subtasks (a task with
+  feature parity with the web app: Next (context/energy filters, drag to
+  reorder), Inbox + guided clarify flow, Scheduled, Waiting-for, Someday, nested subtasks (a task with
   subtasks is a project — outcome line, stalled detection, surfaced next
   action), per-task Eisenhower matrix in the edit sheet,
   Habits, weekly/quarterly Reviews, Goals & values, AI Assistant, full-text
-  Search, Settings (sharing, invites, calendar & planning preferences),
+  Search, Settings (sharing and invites),
   spaces (create/join/switch), sign-up, and the Siri intents
   (`Clarity/Intents/`).
-- `ClarityWatch/` — standalone watch app: capture (dictation), today
-  checklist, habit ticks. Signs in once; the session persists in the
+- `ClarityWatch/` — standalone watch app: capture (dictation), next
+  actions checklist, habit ticks. Signs in once; the session persists in the
   keychain.
 - `BuildCheck/` — dev-only package that compiles `Clarity/` and
   `ClarityWatch/` as macOS libraries so app code stays type-checkable on
@@ -80,19 +79,17 @@ No extra capability needed — App Shortcuts register on first install:
 
 Phrases live in `Clarity/Intents/ClarityIntents.swift`.
 
-## Web API features (assistant, planner, calendar)
+## Web API features (assistant)
 
-The assistant chat, "Plan my day", and calendar views call the deployed
-web app's API routes (the Anthropic key and Google tokens live server-side).
-`WEB_APP_BASE_URL` in `Configs/Supabase.xcconfig` points at the deployment;
-the routes accept the Supabase access token as `Authorization: Bearer …`.
-Google Calendar *connect* stays on the web (`/settings`); once connected,
-the native apps read events and edit planning preferences.
+The assistant chat calls the deployed web app's API routes (the Anthropic
+key lives server-side). `WEB_APP_BASE_URL` in `Configs/Supabase.xcconfig`
+points at the deployment; the routes accept the Supabase access token as
+`Authorization: Bearer …`.
 
 ## Roadmap for this target
 
 - SwiftData offline cache with background sync
-- WidgetKit: today widget + lock-screen quick capture
+- WidgetKit: next-actions widget + lock-screen quick capture
 - APNs reminders for reviews and due tasks
 - Universal links for invite acceptance (currently: paste the invite link
   into "Join a space…")
