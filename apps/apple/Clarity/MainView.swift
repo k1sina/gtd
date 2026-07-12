@@ -43,9 +43,11 @@ enum AppSection: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Sidebar groups mirroring the web app's navigation.
+    /// Sidebar groups mirroring the web app's navigation. Assistant is
+    /// hidden for now — the user drives Clarity through Claude via MCP
+    /// instead; add `.assistant` back here (and in `browse`) to restore it.
     static let groups: [(title: String?, sections: [AppSection])] = [
-        (nil, [.today, .assistant, .inbox, .next, .scheduled, .waiting, .someday]),
+        (nil, [.today, .inbox, .next, .scheduled, .waiting, .someday]),
         ("Organize", [.habits]),
         ("Horizons", [.reviews, .goals]),
         ("System", [.search, .settings]),
@@ -54,7 +56,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     /// iOS: sections that live in the Browse tab rather than the tab bar.
     static let browse: [AppSection] = [
         .scheduled, .waiting, .someday, .habits,
-        .reviews, .goals, .assistant, .search,
+        .reviews, .goals, .search,
     ]
 }
 

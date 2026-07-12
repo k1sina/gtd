@@ -17,7 +17,6 @@ import {
   RefreshCcw,
   Search,
   Settings,
-  Sparkles,
   Sun,
 } from "lucide-react";
 import Link from "next/link";
@@ -31,7 +30,8 @@ import { Button, Dialog, Input } from "./ui";
 
 const NAV = [
   { href: "/today", label: "Today", icon: Sun },
-  { href: "/assistant", label: "Assistant", icon: Sparkles },
+  // Assistant is hidden for now — the user drives Clarity through Claude via
+  // MCP instead. The /assistant route still works; re-add to restore it.
   { href: "/inbox", label: "Inbox", icon: Inbox, badge: "inbox" as const },
   { href: "/next", label: "Next actions", icon: LayoutList },
   { href: "/scheduled", label: "Scheduled", icon: CalendarClock },
