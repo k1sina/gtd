@@ -142,6 +142,16 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
       required: ["task_id"],
     },
   },
+  {
+    name: "delete_task",
+    description:
+      "Permanently delete a task; its subtasks are deleted with it. Irreversible — only when the user explicitly asks to delete/remove a task. To drop a task while keeping history, use update_task with status 'cancelled' instead. Get the task id from list_tasks first.",
+    input_schema: {
+      type: "object",
+      properties: { task_id: { type: "string" } },
+      required: ["task_id"],
+    },
+  },
 ];
 
 interface ToolContext {
@@ -316,6 +326,19 @@ async function completeTask(ctx: ToolContext, input: ToolInput) {
   return { completed: task.title, next_occurrence: insert?.due_at ?? null };
 }
 
+async function deleteTask(ctx: ToolContext, input: ToolInput) {
+  // Subtasks go with the parent via the FK's ON DELETE CASCADE.
+  const { data, error } = await ctx.supabase
+    .from("tasks")
+    .delete()
+    .eq("id", input.task_id)
+    .eq("space_id", ctx.spaceId)
+    .select("id, title")
+    .single();
+  if (error) throw new Error(error.message);
+  return { deleted: data.title };
+}
+
 export async function executeAssistantTool(
   name: string,
   input: ToolInput,
@@ -330,6 +353,8 @@ export async function executeAssistantTool(
       return updateTask(ctx, input);
     case "complete_task":
       return completeTask(ctx, input);
+    case "delete_task":
+      return deleteTask(ctx, input);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }
