@@ -212,6 +212,19 @@ async function completeTask(ctx: ToolContext, input: ToolInput) {
   return { completed: task.title, next_occurrence: insert?.due_at ?? null };
 }
 
+async function deleteTask(ctx: ToolContext, input: ToolInput) {
+  // Subtasks go with the parent via the FK's ON DELETE CASCADE.
+  const { data, error } = await ctx.supabase
+    .from("tasks")
+    .delete()
+    .eq("id", input.task_id)
+    .eq("space_id", ctx.spaceId)
+    .select("id, title")
+    .single();
+  if (error) throw new Error(error.message);
+  return { deleted: data.title };
+}
+
 export async function executeTool(
   name: string,
   input: ToolInput,
@@ -226,6 +239,8 @@ export async function executeTool(
       return updateTask(ctx, input);
     case "complete_task":
       return completeTask(ctx, input);
+    case "delete_task":
+      return deleteTask(ctx, input);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

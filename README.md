@@ -33,7 +33,7 @@ with a partner.
 - `apps/apple` — SwiftUI apps for iPhone, Mac, and Apple Watch plus Siri
   App Intents (XcodeGen project; see `apps/apple/README.md`)
 - `apps/mcp` — MCP stdio server: lets Claude apps command your GTD data
-  with the same 4 tools as the built-in assistant (see `.mcp.json`)
+  with the same 5 tools as the built-in assistant (see `.mcp.json`)
 - `packages/shared` — dependency-free domain logic (priority scoring,
   recurrence engine, NL parser) with Vitest tests; mirrored in Swift as
   `apps/apple/ClarityCore`

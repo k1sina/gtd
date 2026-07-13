@@ -31,6 +31,7 @@ const TOOL_LABELS: Record<string, string> = {
   create_task: "Creating task",
   update_task: "Updating task",
   complete_task: "Completing task",
+  delete_task: "Deleting task",
 };
 
 interface ContentBlock {

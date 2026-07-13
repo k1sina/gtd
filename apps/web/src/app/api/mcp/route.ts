@@ -1,4 +1,4 @@
-// Remote MCP endpoint (Streamable HTTP, stateless). Exposes the same 7 tools
+// Remote MCP endpoint (Streamable HTTP, stateless). Exposes the same tools
 // as the in-app assistant so any MCP client can use Clarity without the repo
 // installed locally. Auth: `Authorization: Basic base64(email:password)` —
 // the Supabase account credentials; every query runs as that user under RLS.

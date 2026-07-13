@@ -158,5 +158,15 @@ server.registerTool(
   handler("complete_task")
 );
 
+server.registerTool(
+  "delete_task",
+  {
+    description:
+      "Permanently delete a task; its subtasks are deleted with it. Irreversible — only when the user explicitly asks to delete/remove a task. To drop a task while keeping history, use update_task with status 'cancelled' instead. Get the task id from list_tasks first.",
+    inputSchema: { task_id: z.string() },
+  },
+  handler("delete_task")
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

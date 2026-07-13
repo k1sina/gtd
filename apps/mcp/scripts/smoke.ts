@@ -18,6 +18,7 @@ const EXPECTED_TOOLS = [
   "create_task",
   "update_task",
   "complete_task",
+  "delete_task",
 ];
 
 function fail(message: string): never {
@@ -134,6 +135,25 @@ if (JSON.parse(textOf(completed)).completed !== marker) {
   fail("complete_task returned unexpected payload");
 }
 console.log("Tier 2: complete_task OK (tasks end in done — self-cleaning)");
+
+// delete_task removes the done pair entirely; the subtask goes via cascade.
+const deleted = await client.callTool({
+  name: "delete_task",
+  arguments: { task_id: taskId },
+});
+if (deleted.isError) fail(`delete_task errored: ${textOf(deleted)}`);
+if (JSON.parse(textOf(deleted)).deleted !== marker) {
+  fail("delete_task returned unexpected payload");
+}
+const afterDelete = await client.callTool({
+  name: "list_tasks",
+  arguments: { status: "done" },
+});
+if (afterDelete.isError) fail(`list_tasks (post-delete) errored: ${textOf(afterDelete)}`);
+if (textOf(afterDelete).includes(taskId) || textOf(afterDelete).includes(subId)) {
+  fail("deleted task or its subtask still present after delete_task");
+}
+console.log("Tier 2: delete_task OK (cascade removed the subtask)");
 
 console.log("SMOKE PASS");
 await client.close();
