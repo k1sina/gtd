@@ -4,6 +4,8 @@ import type {
   Goal,
   Habit,
   HabitLog,
+  LifeExperience,
+  LifeHorizon,
   LifeValue,
   Review,
   Space,
@@ -512,6 +514,103 @@ export function useDeleteGoal() {
       if (error) throw error;
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ["goals"] }),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Lifetime map: horizon (birth date + expectancy) and the experiences on it
+// ---------------------------------------------------------------------------
+
+export function useLifeHorizon() {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["life_horizon"],
+    queryFn: async (): Promise<LifeHorizon | null> => {
+      const { data, error } = await supabase
+        .from("life_horizon")
+        .select("*")
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useSaveLifeHorizon() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      patch: Partial<Omit<LifeHorizon, "user_id">>
+    ): Promise<LifeHorizon> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { data, error } = await supabase
+        .from("life_horizon")
+        .upsert({ ...patch, user_id: user!.id }, { onConflict: "user_id" })
+        .select()
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["life_horizon"] }),
+  });
+}
+
+export function useLifeExperiences() {
+  const supabase = createClient();
+  return useQuery({
+    queryKey: ["life_experiences"],
+    queryFn: async (): Promise<LifeExperience[]> => {
+      const { data, error } = await supabase
+        .from("life_experiences")
+        .select("*")
+        .order("target_age_start", { nullsFirst: false })
+        .order("sort_order")
+        .order("created_at");
+      if (error) throw error;
+      return data;
+    },
+  });
+}
+
+export function useSaveLifeExperience() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (
+      experience: Partial<LifeExperience> & { title?: string }
+    ): Promise<LifeExperience> => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      const { id, ...fields } = experience;
+      const query = id
+        ? supabase.from("life_experiences").update(fields).eq("id", id)
+        : supabase
+            .from("life_experiences")
+            .insert({ ...fields, user_id: user!.id });
+      const { data, error } = await query.select().single();
+      if (error) throw error;
+      return data;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["life_experiences"] }),
+  });
+}
+
+export function useDeleteLifeExperience() {
+  const supabase = createClient();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("life_experiences")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSettled: () => qc.invalidateQueries({ queryKey: ["life_experiences"] }),
   });
 }
 

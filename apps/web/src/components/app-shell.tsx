@@ -11,6 +11,7 @@ import {
   Inbox,
   LayoutList,
   LogOut,
+  Map as MapIcon,
   Menu,
   Moon,
   Plus,
@@ -63,6 +64,7 @@ const NAV_GROUPS: {
     items: [
       { href: "/review", label: "Reviews", icon: Compass },
       { href: "/goals", label: "Goals & values", icon: Heart },
+      { href: "/experiences", label: "Life experiences", icon: MapIcon },
     ],
   },
 ];

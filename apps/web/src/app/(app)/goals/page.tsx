@@ -4,6 +4,7 @@ import type { Goal, GoalStatus } from "@gtd/shared";
 import clsx from "clsx";
 import { Heart, Plus, Target, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
+import { LifeExperiencesSummary } from "@/components/life-map";
 import { PageHeader } from "@/components/task-list";
 import {
   Button,
@@ -85,6 +86,9 @@ export default function GoalsPage() {
         title="Goals & values"
         subtitle="The horizons above your projects — why you do what you do"
       />
+
+      {/* Lifetime map — the horizon above quarterly goals. */}
+      <LifeExperiencesSummary />
 
       {/* Life values */}
       <section className="mb-10">

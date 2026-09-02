@@ -17,6 +17,29 @@ export type ReviewType = "weekly" | "quarterly";
 
 export type GoalStatus = "active" | "achieved" | "partial" | "dropped";
 
+/** Lifetime-map experiences: what you want to live, and when in your life. */
+export type ExperienceCategory =
+  | "travel"
+  | "adventure"
+  | "craft"
+  | "people"
+  | "create"
+  | "wellbeing"
+  | "contribute"
+  | "other";
+
+/**
+ * `dream` — wanted, not yet placed in time. `planned` — given a window.
+ * `active` — under way. `lived` — done. `released` — consciously let go,
+ * which is the other half of choosing.
+ */
+export type ExperienceStatus =
+  | "dream"
+  | "planned"
+  | "active"
+  | "lived"
+  | "released";
+
 export interface Profile {
   id: string;
   email: string;
@@ -105,6 +128,32 @@ export interface Goal {
   quarter: number; // 1..4
   status: GoalStatus;
   score: number | null; // 0..10 set during quarterly review
+  reflection: string | null;
+  sort_order: number;
+  created_at: string;
+}
+
+export interface LifeHorizon {
+  user_id: string;
+  birth_date: string | null; // YYYY-MM-DD
+  life_expectancy: number; // the horizon you plan against, not a prediction
+  created_at: string;
+  updated_at: string;
+}
+
+export interface LifeExperience {
+  id: string;
+  user_id: string;
+  value_id: string | null;
+  title: string;
+  notes: string | null;
+  category: ExperienceCategory;
+  status: ExperienceStatus;
+  // Inclusive age window; both null = not placed in life yet.
+  target_age_start: number | null;
+  target_age_end: number | null;
+  with_whom: string | null;
+  lived_on: string | null; // YYYY-MM-DD
   reflection: string | null;
   sort_order: number;
   created_at: string;
