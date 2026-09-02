@@ -3,10 +3,10 @@
 // window back out as ages and calendar years.
 //
 // All of it is local-civil-date arithmetic (no timezone maths): a birth date
-// is the day on the calendar, not an instant.
-//
-// No ClarityCore mirror yet — the lifetime map is web-only so far. Add
-// Life.swift alongside its tests when the Apple apps grow the feature.
+// is the day on the calendar, not an instant. Mirrored in
+// apps/apple/ClarityCore/Sources/ClarityCore/Life.swift — keep the two and
+// their test suites in sync. The tool-shaping helpers at the bottom are
+// server-side only and have no Swift counterpart.
 
 import type {
   ExperienceCategory,

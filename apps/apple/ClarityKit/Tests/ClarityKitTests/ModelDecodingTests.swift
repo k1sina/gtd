@@ -154,3 +154,83 @@ import Testing
         #expect(message.toolNames == ["create_task"])
     }
 }
+
+// Lifetime map rows — column names from
+// supabase/migrations/20260713000000_life_experiences.sql.
+
+@Suite struct LifeMapDecodingTests {
+    @Test func decodesLifeHorizonRow() throws {
+        let json = """
+            {
+              "user_id": "6f1b2a34-0000-4000-8000-000000000003",
+              "birth_date": "1988-07-20",
+              "life_expectancy": 85,
+              "created_at": "2026-09-02T14:42:17.793486+00:00",
+              "updated_at": "2026-09-02T14:42:17.793486+00:00"
+            }
+            """.data(using: .utf8)!
+        let horizon = try PostgrestJSON.decoder.decode(LifeHorizon.self, from: json)
+        #expect(horizon.birthDate == "1988-07-20")
+        #expect(horizon.lifeExpectancy == 85)
+        #expect(horizon.input?.birthDate == "1988-07-20")
+    }
+
+    @Test func aHorizonWithoutABirthDateHasNoScale() throws {
+        let json = """
+            {
+              "user_id": "6f1b2a34-0000-4000-8000-000000000003",
+              "birth_date": null,
+              "life_expectancy": 85,
+              "created_at": "2026-09-02T14:42:17+00:00",
+              "updated_at": "2026-09-02T14:42:17+00:00"
+            }
+            """.data(using: .utf8)!
+        let horizon = try PostgrestJSON.decoder.decode(LifeHorizon.self, from: json)
+        #expect(horizon.input == nil)
+    }
+
+    @Test func decodesPlacedAndUnplacedExperiences() throws {
+        let json = """
+            [
+              {
+                "id": "6f1b2a34-0000-4000-8000-000000000030",
+                "user_id": "6f1b2a34-0000-4000-8000-000000000003",
+                "value_id": null,
+                "title": "Sail the Greek islands for a month",
+                "notes": null,
+                "category": "travel",
+                "status": "planned",
+                "target_age_start": 39,
+                "target_age_end": 40,
+                "with_whom": "Eli",
+                "lived_on": null,
+                "reflection": null,
+                "sort_order": 0,
+                "created_at": "2026-09-02T14:42:17.793486+00:00"
+              },
+              {
+                "id": "6f1b2a34-0000-4000-8000-000000000031",
+                "user_id": "6f1b2a34-0000-4000-8000-000000000003",
+                "value_id": null,
+                "title": "Learn to sail properly",
+                "notes": null,
+                "category": "craft",
+                "status": "dream",
+                "target_age_start": null,
+                "target_age_end": null,
+                "with_whom": null,
+                "lived_on": null,
+                "reflection": null,
+                "sort_order": 1,
+                "created_at": "2026-09-02T14:42:17.793486+00:00"
+              }
+            ]
+            """.data(using: .utf8)!
+        let rows = try PostgrestJSON.decoder.decode([LifeExperience].self, from: json)
+        #expect(rows[0].category == .travel)
+        #expect(rows[0].withWhom == "Eli")
+        #expect(rows[0].targetAgeStart == 39)
+        #expect(rows[1].status == .dream)
+        #expect(rows[1].targetAgeStart == nil)
+    }
+}

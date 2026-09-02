@@ -4,7 +4,7 @@ import SwiftUI
 enum AppSection: String, CaseIterable, Identifiable {
     case assistant, inbox, next, scheduled, waiting, someday
     case habits
-    case reviews, goals
+    case reviews, goals, experiences
     case search, settings
 
     var id: String { rawValue }
@@ -20,6 +20,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .habits: return "Habits"
         case .reviews: return "Reviews"
         case .goals: return "Goals & values"
+        case .experiences: return "Life experiences"
         case .search: return "Search"
         case .settings: return "Settings"
         }
@@ -36,6 +37,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         case .habits: return "flame"
         case .reviews: return "checklist"
         case .goals: return "scope"
+        case .experiences: return "map"
         case .search: return "magnifyingglass"
         case .settings: return "gearshape"
         }
@@ -51,7 +53,7 @@ enum AppSection: String, CaseIterable, Identifiable {
         (nil, [.next]),
         ("Capture", [.inbox]),
         ("Upcoming & parked", [.scheduled, .waiting, .someday, .habits]),
-        ("Reflect", [.reviews, .goals]),
+        ("Reflect", [.reviews, .goals, .experiences]),
         (nil, [.settings]),
     ]
 
@@ -59,7 +61,7 @@ enum AppSection: String, CaseIterable, Identifiable {
     /// Search leads — it was buried at the bottom before.
     static let browse: [AppSection] = [
         .search, .scheduled, .waiting, .someday, .habits,
-        .reviews, .goals,
+        .reviews, .goals, .experiences,
     ]
 }
 
@@ -149,6 +151,7 @@ func sectionView(_ section: AppSection) -> some View {
     case .habits: HabitsView()
     case .reviews: ReviewsHubView()
     case .goals: GoalsView()
+    case .experiences: LifeMapView()
     case .search: SearchView()
     case .settings: SettingsView()
     }

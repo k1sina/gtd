@@ -13,7 +13,7 @@ generated from `project.yml` — never edit `Clarity.xcodeproj` by hand.
 
 - `ClarityCore/` — dependency-free Swift package: Eisenhower priority
   scoring, the RRULE-subset recurrence engine, the natural-language
-  quick-add parser, and Codable row models. Mirrors `packages/shared`;
+  quick-add parser, the lifetime-map chapter maths, and Codable row models. Mirrors `packages/shared`;
   keep the two in sync when either changes (the test suites are ports of
   the vitest suites and must stay identical).
 - `ClarityKit/` — the shared data layer (ClarityCore + supabase-swift):
@@ -29,7 +29,8 @@ generated from `project.yml` — never edit `Clarity.xcodeproj` by hand.
   reorder), Inbox + guided clarify flow, Scheduled, Waiting-for, Someday, nested subtasks (a task with
   subtasks is a project — outcome line, stalled detection, surfaced next
   action), per-task Eisenhower matrix in the edit sheet,
-  Habits, weekly/quarterly Reviews, Goals & values, AI Assistant, full-text
+  Habits, weekly/quarterly Reviews, Goals & values, the lifetime map
+  (Life experiences), AI Assistant, full-text
   Search, Settings (sharing and invites),
   spaces (create/join/switch), sign-up, and the Siri intents
   (`Clarity/Intents/`).

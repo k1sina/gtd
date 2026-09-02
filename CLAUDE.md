@@ -58,8 +58,8 @@ SwiftUI apps for iPhone/Mac/Watch with Siri App Intents, and an MCP server.
   sync.
 - Personal horizon data (`life_values`, `goals`, `reviews`, `life_horizon`,
   `life_experiences`) hangs off `user_id`, not `space_id` — it never crosses
-  into a shared space. The lifetime map (`/experiences`) places experiences
-  into age windows rather than dates; its maths lives in
-  `packages/shared/src/life.ts` and has no ClarityCore mirror yet.
+  into a shared space. The lifetime map (`/experiences`, Apple
+  `LifeMapView`) places experiences into age windows rather than dates; its
+  maths lives in `packages/shared/src/life.ts` ↔ `ClarityCore/Life.swift`.
 - New tables in `public` are NOT auto-exposed to API roles — migrations must
   GRANT to `authenticated` and add RLS policies.
