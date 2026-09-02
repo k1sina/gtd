@@ -1,9 +1,18 @@
 // Tool executors — ports of apps/web/src/lib/assistant-tools.ts (same names,
 // same behavior). Keep the two implementations in sync.
 
+import type {
+  ExperienceFilter,
+  LifeExperience,
+  LifeHorizon,
+  LifeHorizonInput,
+} from "@gtd/shared";
 import {
+  experienceSummary,
+  filterExperiences,
   isDeferred,
   isStalledParent,
+  lifeProgress,
   nextOccurrenceInsert,
   priorityScore,
   quadrant,
@@ -225,6 +234,138 @@ async function deleteTask(ctx: ToolContext, input: ToolInput) {
   return { deleted: data.title };
 }
 
+// ---------------------------------------------------------------------------
+// Lifetime map (personal horizon data — user-scoped, never space-scoped)
+// ---------------------------------------------------------------------------
+
+async function loadHorizon(ctx: ToolContext): Promise<{
+  row: LifeHorizon | null;
+  input: LifeHorizonInput | null;
+}> {
+  const { data, error } = await ctx.supabase
+    .from("life_horizon")
+    .select("*")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const row = (data as LifeHorizon | null) ?? null;
+  return {
+    row,
+    input: row?.birth_date
+      ? { birthDate: row.birth_date, lifeExpectancy: row.life_expectancy }
+      : null,
+  };
+}
+
+async function listLifeExperiences(ctx: ToolContext, input: ToolInput) {
+  const { row, input: horizon } = await loadHorizon(ctx);
+  const { data, error } = await ctx.supabase
+    .from("life_experiences")
+    .select("*")
+    .limit(500);
+  if (error) throw new Error(error.message);
+
+  const now = new Date();
+  const rows = filterExperiences(
+    (data ?? []) as LifeExperience[],
+    input as ExperienceFilter,
+    horizon,
+    now
+  );
+  return {
+    horizon: horizon
+      ? {
+          birth_date: row!.birth_date,
+          life_expectancy: row!.life_expectancy,
+          ...lifeProgress(horizon, now),
+        }
+      : null,
+    experiences: rows.map((e) => experienceSummary(e, horizon, now)),
+  };
+}
+
+async function saveLifeExperience(ctx: ToolContext, input: ToolInput) {
+  const patch: Record<string, unknown> = {};
+  for (const key of ["title", "category", "target_age_start", "target_age_end"]) {
+    if (input[key] !== undefined) patch[key] = input[key];
+  }
+  // Optional prose/links clear on an empty string.
+  for (const key of ["notes", "with_whom", "value_id", "lived_on", "reflection"]) {
+    if (input[key] !== undefined) patch[key] = input[key] === "" ? null : input[key];
+  }
+  if (input.unplace) {
+    patch.target_age_start = null;
+    patch.target_age_end = null;
+  }
+  // A window makes it planned, losing one makes it a dream again — unless the
+  // caller says where it stands.
+  if (input.status !== undefined) {
+    patch.status = input.status;
+  } else if (patch.target_age_start !== undefined || patch.target_age_end !== undefined) {
+    patch.status =
+      patch.target_age_start == null && patch.target_age_end == null
+        ? "dream"
+        : "planned";
+  }
+  if (patch.status === "lived" && input.lived_on === undefined) {
+    patch.lived_on = new Date().toISOString().slice(0, 10);
+  }
+
+  if (!input.experience_id && !patch.title) {
+    throw new Error("title is required when creating a life experience");
+  }
+
+  const query = input.experience_id
+    ? ctx.supabase
+        .from("life_experiences")
+        .update(patch)
+        .eq("id", input.experience_id)
+    : ctx.supabase
+        .from("life_experiences")
+        .insert({ ...patch, user_id: ctx.userId });
+  const { data, error } = await query.select("*").single();
+  if (error) throw new Error(error.message);
+
+  const { input: horizon } = await loadHorizon(ctx);
+  return {
+    saved: experienceSummary(data as LifeExperience, horizon, new Date()),
+  };
+}
+
+async function deleteLifeExperience(ctx: ToolContext, input: ToolInput) {
+  const { data, error } = await ctx.supabase
+    .from("life_experiences")
+    .delete()
+    .eq("id", input.experience_id)
+    .select("id, title")
+    .single();
+  if (error) throw new Error(error.message);
+  return { deleted: data.title };
+}
+
+async function setLifeHorizon(ctx: ToolContext, input: ToolInput) {
+  const patch: Record<string, unknown> = { user_id: ctx.userId };
+  if (input.birth_date !== undefined) patch.birth_date = input.birth_date || null;
+  if (input.life_expectancy !== undefined) patch.life_expectancy = input.life_expectancy;
+  const { data, error } = await ctx.supabase
+    .from("life_horizon")
+    .upsert(patch, { onConflict: "user_id" })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  const row = data as LifeHorizon;
+  return {
+    birth_date: row.birth_date,
+    life_expectancy: row.life_expectancy,
+    ...(row.birth_date
+      ? lifeProgress(
+          { birthDate: row.birth_date, lifeExpectancy: row.life_expectancy },
+          new Date()
+        )
+      : {}),
+  };
+}
+
 export async function executeTool(
   name: string,
   input: ToolInput,
@@ -241,6 +382,14 @@ export async function executeTool(
       return completeTask(ctx, input);
     case "delete_task":
       return deleteTask(ctx, input);
+    case "list_life_experiences":
+      return listLifeExperiences(ctx, input);
+    case "save_life_experience":
+      return saveLifeExperience(ctx, input);
+    case "delete_life_experience":
+      return deleteLifeExperience(ctx, input);
+    case "set_life_horizon":
+      return setLifeHorizon(ctx, input);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

@@ -19,6 +19,10 @@ const EXPECTED_TOOLS = [
   "update_task",
   "complete_task",
   "delete_task",
+  "list_life_experiences",
+  "save_life_experience",
+  "delete_life_experience",
+  "set_life_horizon",
 ];
 
 function fail(message: string): never {
@@ -154,6 +158,61 @@ if (textOf(afterDelete).includes(taskId) || textOf(afterDelete).includes(subId))
   fail("deleted task or its subtask still present after delete_task");
 }
 console.log("Tier 2: delete_task OK (cascade removed the subtask)");
+
+// ---- Tier 2: lifetime map -------------------------------------------------
+// set_life_horizon is deliberately not exercised: it would overwrite the real
+// account's birth date. The map is read as it stands.
+const mapListed = await client.callTool({
+  name: "list_life_experiences",
+  arguments: { status: "open" },
+});
+if (mapListed.isError) fail(`list_life_experiences errored: ${textOf(mapListed)}`);
+const mapBody = JSON.parse(textOf(mapListed));
+if (!Array.isArray(mapBody.experiences)) {
+  fail("list_life_experiences returned no experiences array");
+}
+console.log(
+  `Tier 2: lifetime map readable (horizon ${mapBody.horizon ? "set" : "unset"})`
+);
+
+const savedExp = await client.callTool({
+  name: "save_life_experience",
+  arguments: {
+    title: marker,
+    category: "adventure",
+    target_age_start: 40,
+    target_age_end: 45,
+  },
+});
+if (savedExp.isError) fail(`save_life_experience errored: ${textOf(savedExp)}`);
+const savedBody = JSON.parse(textOf(savedExp)).saved;
+const expId: string = savedBody?.id ?? fail("save_life_experience returned no id");
+// A window with no status given makes it planned.
+if (savedBody.status !== "planned") {
+  fail(`expected a placed experience to be 'planned', got ${savedBody.status}`);
+}
+console.log(`Tier 2: created experience ${expId} (${savedBody.window ?? "no horizon"})`);
+
+const unplaced = await client.callTool({
+  name: "save_life_experience",
+  arguments: { experience_id: expId, unplace: true },
+});
+if (unplaced.isError) fail(`save_life_experience (unplace) errored: ${textOf(unplaced)}`);
+const unplacedBody = JSON.parse(textOf(unplaced)).saved;
+if (unplacedBody.target_age_start !== null || unplacedBody.status !== "dream") {
+  fail("unplace did not clear the window back to a dream");
+}
+console.log("Tier 2: unplace OK");
+
+const deletedExp = await client.callTool({
+  name: "delete_life_experience",
+  arguments: { experience_id: expId },
+});
+if (deletedExp.isError) fail(`delete_life_experience errored: ${textOf(deletedExp)}`);
+if (JSON.parse(textOf(deletedExp)).deleted !== marker) {
+  fail("delete_life_experience returned unexpected payload");
+}
+console.log("Tier 2: delete_life_experience OK (self-cleaning)");
 
 console.log("SMOKE PASS");
 await client.close();

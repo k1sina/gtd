@@ -5,13 +5,35 @@ import "server-only";
 
 import type Anthropic from "@anthropic-ai/sdk";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type {
+  ExperienceFilter,
+  LifeExperience,
+  LifeHorizon,
+  LifeHorizonInput,
+} from "@gtd/shared";
 import {
+  experienceSummary,
+  filterExperiences,
   isDeferred,
   isStalledParent,
+  lifeProgress,
   nextOccurrenceInsert,
   priorityScore,
   quadrant,
 } from "@gtd/shared";
+
+// Mirrored in the life_experiences.category check constraint and in
+// apps/mcp/src/index.ts.
+const EXPERIENCE_CATEGORIES = [
+  "travel",
+  "adventure",
+  "craft",
+  "people",
+  "create",
+  "wellbeing",
+  "contribute",
+  "other",
+] as const;
 
 export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
   {
@@ -150,6 +172,97 @@ export const ASSISTANT_TOOLS: Anthropic.Tool[] = [
       type: "object",
       properties: { task_id: { type: "string" } },
       required: ["task_id"],
+    },
+  },
+  {
+    name: "list_life_experiences",
+    description:
+      "List the experiences the user wants to have in their life (the lifetime map), with the age window each is placed in and the calendar years that window covers. Also returns the user's life horizon — current age, years left, share of the horizon spent. Call this for questions about what they want to live, what is planned for a stage of life, what windows are closing, or what is still an unplaced dream.",
+    input_schema: {
+      type: "object",
+      properties: {
+        status: {
+          type: "string",
+          enum: ["dream", "planned", "active", "lived", "released", "open"],
+          description:
+            "'open' = everything not lived or released. 'released' = consciously let go.",
+        },
+        category: {
+          type: "string",
+          enum: EXPERIENCE_CATEGORIES,
+          description: "Only experiences of this kind",
+        },
+        unplaced: {
+          type: "boolean",
+          description: "Only experiences with no age window yet",
+        },
+        within_years: {
+          type: "number",
+          description:
+            "Only windows open now or opening within N years — use for \"what should I do soon?\"",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "save_life_experience",
+    description:
+      "Create or update an experience on the lifetime map. Omit experience_id to create. Place it in life with target_age_start/target_age_end (ages, not dates — 'in my 40s' is 40 to 49); pass unplace to take the window off again. Use status 'lived' when it happened (with a reflection) and 'released' when the user consciously lets it go.",
+    input_schema: {
+      type: "object",
+      properties: {
+        experience_id: {
+          type: "string",
+          description: "Update this experience; omit to create a new one",
+        },
+        title: { type: "string", description: "Required when creating" },
+        notes: { type: "string", description: "Why this one matters" },
+        category: { type: "string", enum: EXPERIENCE_CATEGORIES },
+        status: {
+          type: "string",
+          enum: ["dream", "planned", "active", "lived", "released"],
+          description:
+            "Defaults follow the window: giving one makes it 'planned', removing it makes it 'dream'",
+        },
+        target_age_start: { type: "number", description: "Age the window opens" },
+        target_age_end: { type: "number", description: "Age the window closes (inclusive)" },
+        unplace: {
+          type: "boolean",
+          description: "Clear the age window, back to an unplaced dream",
+        },
+        with_whom: { type: "string", description: "Who it should be with" },
+        value_id: { type: "string", description: "Life value this serves" },
+        lived_on: { type: "string", description: "YYYY-MM-DD; set automatically with status 'lived'" },
+        reflection: {
+          type: "string",
+          description: "What it was actually like, or why it is being let go",
+        },
+      },
+      required: [],
+    },
+  },
+  {
+    name: "delete_life_experience",
+    description:
+      "Permanently delete an experience from the lifetime map. Irreversible — prefer save_life_experience with status 'released' to let something go while keeping the record of having wanted it.",
+    input_schema: {
+      type: "object",
+      properties: { experience_id: { type: "string" } },
+      required: ["experience_id"],
+    },
+  },
+  {
+    name: "set_life_horizon",
+    description:
+      "Set the scale the lifetime map is drawn against: the user's birth date and the age they choose to plan to (not a prediction — the default is 85). Without a birth date the map has no ages or years.",
+    input_schema: {
+      type: "object",
+      properties: {
+        birth_date: { type: "string", description: "YYYY-MM-DD" },
+        life_expectancy: { type: "number", description: "40-120; the age they plan to" },
+      },
+      required: [],
     },
   },
 ];
@@ -339,6 +452,138 @@ async function deleteTask(ctx: ToolContext, input: ToolInput) {
   return { deleted: data.title };
 }
 
+// ---------------------------------------------------------------------------
+// Lifetime map (personal horizon data — user-scoped, never space-scoped)
+// ---------------------------------------------------------------------------
+
+async function loadHorizon(ctx: ToolContext): Promise<{
+  row: LifeHorizon | null;
+  input: LifeHorizonInput | null;
+}> {
+  const { data, error } = await ctx.supabase
+    .from("life_horizon")
+    .select("*")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  const row = (data as LifeHorizon | null) ?? null;
+  return {
+    row,
+    input: row?.birth_date
+      ? { birthDate: row.birth_date, lifeExpectancy: row.life_expectancy }
+      : null,
+  };
+}
+
+async function listLifeExperiences(ctx: ToolContext, input: ToolInput) {
+  const { row, input: horizon } = await loadHorizon(ctx);
+  const { data, error } = await ctx.supabase
+    .from("life_experiences")
+    .select("*")
+    .limit(500);
+  if (error) throw new Error(error.message);
+
+  const now = new Date();
+  const rows = filterExperiences(
+    (data ?? []) as LifeExperience[],
+    input as ExperienceFilter,
+    horizon,
+    now
+  );
+  return {
+    horizon: horizon
+      ? {
+          birth_date: row!.birth_date,
+          life_expectancy: row!.life_expectancy,
+          ...lifeProgress(horizon, now),
+        }
+      : null,
+    experiences: rows.map((e) => experienceSummary(e, horizon, now)),
+  };
+}
+
+async function saveLifeExperience(ctx: ToolContext, input: ToolInput) {
+  const patch: Record<string, unknown> = {};
+  for (const key of ["title", "category", "target_age_start", "target_age_end"]) {
+    if (input[key] !== undefined) patch[key] = input[key];
+  }
+  // Optional prose/links clear on an empty string.
+  for (const key of ["notes", "with_whom", "value_id", "lived_on", "reflection"]) {
+    if (input[key] !== undefined) patch[key] = input[key] === "" ? null : input[key];
+  }
+  if (input.unplace) {
+    patch.target_age_start = null;
+    patch.target_age_end = null;
+  }
+  // A window makes it planned, losing one makes it a dream again — unless the
+  // caller says where it stands.
+  if (input.status !== undefined) {
+    patch.status = input.status;
+  } else if (patch.target_age_start !== undefined || patch.target_age_end !== undefined) {
+    patch.status =
+      patch.target_age_start == null && patch.target_age_end == null
+        ? "dream"
+        : "planned";
+  }
+  if (patch.status === "lived" && input.lived_on === undefined) {
+    patch.lived_on = new Date().toISOString().slice(0, 10);
+  }
+
+  if (!input.experience_id && !patch.title) {
+    throw new Error("title is required when creating a life experience");
+  }
+
+  const query = input.experience_id
+    ? ctx.supabase
+        .from("life_experiences")
+        .update(patch)
+        .eq("id", input.experience_id)
+    : ctx.supabase
+        .from("life_experiences")
+        .insert({ ...patch, user_id: ctx.userId });
+  const { data, error } = await query.select("*").single();
+  if (error) throw new Error(error.message);
+
+  const { input: horizon } = await loadHorizon(ctx);
+  return {
+    saved: experienceSummary(data as LifeExperience, horizon, new Date()),
+  };
+}
+
+async function deleteLifeExperience(ctx: ToolContext, input: ToolInput) {
+  const { data, error } = await ctx.supabase
+    .from("life_experiences")
+    .delete()
+    .eq("id", input.experience_id)
+    .select("id, title")
+    .single();
+  if (error) throw new Error(error.message);
+  return { deleted: data.title };
+}
+
+async function setLifeHorizon(ctx: ToolContext, input: ToolInput) {
+  const patch: Record<string, unknown> = { user_id: ctx.userId };
+  if (input.birth_date !== undefined) patch.birth_date = input.birth_date || null;
+  if (input.life_expectancy !== undefined) patch.life_expectancy = input.life_expectancy;
+  const { data, error } = await ctx.supabase
+    .from("life_horizon")
+    .upsert(patch, { onConflict: "user_id" })
+    .select("*")
+    .single();
+  if (error) throw new Error(error.message);
+
+  const row = data as LifeHorizon;
+  return {
+    birth_date: row.birth_date,
+    life_expectancy: row.life_expectancy,
+    ...(row.birth_date
+      ? lifeProgress(
+          { birthDate: row.birth_date, lifeExpectancy: row.life_expectancy },
+          new Date()
+        )
+      : {}),
+  };
+}
+
 export async function executeAssistantTool(
   name: string,
   input: ToolInput,
@@ -355,6 +600,14 @@ export async function executeAssistantTool(
       return completeTask(ctx, input);
     case "delete_task":
       return deleteTask(ctx, input);
+    case "list_life_experiences":
+      return listLifeExperiences(ctx, input);
+    case "save_life_experience":
+      return saveLifeExperience(ctx, input);
+    case "delete_life_experience":
+      return deleteLifeExperience(ctx, input);
+    case "set_life_horizon":
+      return setLifeHorizon(ctx, input);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

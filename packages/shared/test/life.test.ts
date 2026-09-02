@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import type { LifeExperience } from "../src/types";
 import {
   ageOn,
+  experienceSummary,
+  filterExperiences,
   chapterKeyForAge,
   compareExperiences,
   experienceWindow,
@@ -193,5 +195,89 @@ describe("compareExperiences", () => {
       "a",
       "b",
     ]);
+  });
+});
+
+describe("filterExperiences", () => {
+  const rows = [
+    exp({ id: "soon", target_age_start: 39, target_age_end: 40 }),
+    exp({ id: "later", target_age_start: 60, target_age_end: 69, category: "craft" }),
+    exp({ id: "dream", status: "dream" }),
+    exp({ id: "done", target_age_start: 30, target_age_end: 31, status: "lived" }),
+  ];
+
+  it("returns everything, earliest window first, with no filter", () => {
+    expect(filterExperiences(rows, {}, horizon, now).map((e) => e.id)).toEqual([
+      "done",
+      "soon",
+      "later",
+      "dream",
+    ]);
+  });
+
+  it("filters by status, with 'open' meaning not lived or released", () => {
+    expect(
+      filterExperiences(rows, { status: "open" }, horizon, now).map((e) => e.id)
+    ).toEqual(["soon", "later", "dream"]);
+    expect(
+      filterExperiences(rows, { status: "dream" }, horizon, now).map((e) => e.id)
+    ).toEqual(["dream"]);
+  });
+
+  it("filters by category and by having no window", () => {
+    expect(
+      filterExperiences(rows, { category: "craft" }, horizon, now).map((e) => e.id)
+    ).toEqual(["later"]);
+    expect(
+      filterExperiences(rows, { unplaced: true }, horizon, now).map((e) => e.id)
+    ).toEqual(["dream"]);
+  });
+
+  it("keeps only windows overlapping the next N years", () => {
+    expect(
+      filterExperiences(rows, { within_years: 5 }, horizon, now).map((e) => e.id)
+    ).toEqual(["soon"]);
+    // A window that closed before today does not overlap it.
+    expect(
+      filterExperiences(rows, { within_years: 50 }, horizon, now).map((e) => e.id)
+    ).toEqual(["soon", "later"]);
+  });
+
+  it("skips the year filter when there is no horizon to measure against", () => {
+    expect(
+      filterExperiences(rows, { within_years: 1 }, null, now).map((e) => e.id)
+    ).toHaveLength(4);
+  });
+});
+
+describe("experienceSummary", () => {
+  it("resolves ages into years and names the chapter", () => {
+    const s = experienceSummary(
+      exp({ target_age_start: 42, target_age_end: 45 }),
+      horizon,
+      now
+    );
+    expect(s.window).toBe("age 42–45 · 2030–2033");
+    expect(s.chapter).toBe("40s");
+    expect(s.missed).toBe(false);
+  });
+
+  it("leaves window and chapter null for an unplaced dream", () => {
+    const s = experienceSummary(exp({ status: "dream" }), horizon, now);
+    expect(s.window).toBeNull();
+    expect(s.chapter).toBeNull();
+  });
+
+  it("labels the open-ended tail chapter", () => {
+    expect(
+      experienceSummary(exp({ target_age_start: 95 }), horizon, now).chapter
+    ).toBe("beyond");
+  });
+
+  it("works without a horizon, reporting ages but no years", () => {
+    const s = experienceSummary(exp({ target_age_start: 42 }), null, now);
+    expect(s.target_age_start).toBe(42);
+    expect(s.window).toBeNull();
+    expect(s.chapter).toBeNull();
   });
 });

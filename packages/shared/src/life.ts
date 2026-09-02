@@ -8,7 +8,11 @@
 // No ClarityCore mirror yet — the lifetime map is web-only so far. Add
 // Life.swift alongside its tests when the Apple apps grow the feature.
 
-import type { LifeExperience } from "./types";
+import type {
+  ExperienceCategory,
+  ExperienceStatus,
+  LifeExperience,
+} from "./types";
 
 /** Chapters are decades of age; the current decade is where "you are here". */
 export const CHAPTER_SPAN = 10;
@@ -206,4 +210,104 @@ export function compareExperiences(
   if (aStart !== bStart) return aStart - bStart;
   if (a.sort_order !== b.sort_order) return a.sort_order - b.sort_order;
   return a.created_at.localeCompare(b.created_at);
+}
+
+// ---------------------------------------------------------------------------
+// Shaping for the assistant / MCP tool surface
+// ---------------------------------------------------------------------------
+
+export interface ExperienceFilter {
+  /** A concrete status, or "open" for everything not lived or released. */
+  status?: ExperienceStatus | "open";
+  category?: ExperienceCategory;
+  /** Only experiences with no age window at all. */
+  unplaced?: boolean;
+  /** Only windows that are open now or open within N years (needs a horizon). */
+  within_years?: number;
+}
+
+export function filterExperiences(
+  rows: LifeExperience[],
+  filter: ExperienceFilter,
+  horizon: LifeHorizonInput | null,
+  now: Date = new Date()
+): LifeExperience[] {
+  let out = rows;
+  if (filter.status === "open") {
+    out = out.filter((e) => e.status !== "lived" && e.status !== "released");
+  } else if (filter.status) {
+    out = out.filter((e) => e.status === filter.status);
+  }
+  if (filter.category) {
+    out = out.filter((e) => e.category === filter.category);
+  }
+  if (filter.unplaced) {
+    out = out.filter(
+      (e) => e.target_age_start == null && e.target_age_end == null
+    );
+  }
+  if (filter.within_years != null && horizon) {
+    const age = ageOn(horizon.birthDate, now);
+    const cutoff = age + filter.within_years;
+    out = out.filter((e) => {
+      const start = e.target_age_start ?? e.target_age_end;
+      const end = e.target_age_end ?? start;
+      // The window overlaps [now, now + N years].
+      return start != null && start <= cutoff && end! >= age;
+    });
+  }
+  return [...out].sort(compareExperiences);
+}
+
+export interface ExperienceSummary {
+  id: string;
+  title: string;
+  category: ExperienceCategory;
+  status: ExperienceStatus;
+  /** "age 40–45 · 2028–2033", or null while unplaced. */
+  window: string | null;
+  target_age_start: number | null;
+  target_age_end: number | null;
+  /** Which decade-of-life chapter it sits in, e.g. "40s"; null while unplaced. */
+  chapter: string | null;
+  closing_soon: boolean;
+  /** The window closed and it never happened. */
+  missed: boolean;
+  with_whom: string | null;
+  notes: string | null;
+  lived_on: string | null;
+  reflection: string | null;
+  value_id: string | null;
+}
+
+/** One experience as the assistant should see it: ages resolved to years. */
+export function experienceSummary(
+  exp: LifeExperience,
+  horizon: LifeHorizonInput | null,
+  now: Date = new Date()
+): ExperienceSummary {
+  const window = horizon ? experienceWindow(exp, horizon, now) : null;
+  const start = exp.target_age_start ?? exp.target_age_end;
+  return {
+    id: exp.id,
+    title: exp.title,
+    category: exp.category,
+    status: exp.status,
+    window: window?.label ?? null,
+    target_age_start: exp.target_age_start,
+    target_age_end: exp.target_age_end,
+    chapter:
+      horizon && start != null
+        ? chapterKeyForAge(start, horizon) === "beyond"
+          ? "beyond"
+          : `${chapterKeyForAge(start, horizon)}s`
+        : null,
+    closing_soon: window?.closingSoon ?? false,
+    missed: window?.missed ?? false,
+    with_whom: exp.with_whom,
+    notes: exp.notes,
+    lived_on: exp.lived_on,
+    reflection: exp.reflection,
+    value_id: exp.value_id,
+  };
 }
