@@ -3,13 +3,18 @@
 
 import type {
   ExperienceFilter,
+  Goal,
+  Habit,
+  HabitLog,
   LifeExperience,
   LifeHorizon,
   LifeHorizonInput,
+  LifeValue,
 } from "@gtd/shared";
 import {
   experienceSummary,
   filterExperiences,
+  habitSummary,
   isDeferred,
   isStalledParent,
   lifeProgress,
@@ -366,6 +371,271 @@ async function setLifeHorizon(ctx: ToolContext, input: ToolInput) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// Habits (space-scoped; the logs are personal)
+// ---------------------------------------------------------------------------
+
+/** Streaks look back up to a year, so the log fetch has to as well. */
+function habitLogWindowStart(now: Date): string {
+  const start = new Date(now);
+  start.setDate(start.getDate() - 366);
+  return toLogDate(start);
+}
+
+/** A log date is a day on the calendar, not an instant. */
+function toLogDate(date: Date): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+async function listHabits(ctx: ToolContext, input: ToolInput) {
+  const now = new Date();
+  const days = Math.min(90, Math.max(1, Number(input.days ?? 7)));
+
+  let query = ctx.supabase
+    .from("habits")
+    .select("*")
+    .eq("space_id", ctx.spaceId);
+  if (!input.include_archived) query = query.is("archived_at", null);
+  const { data: habits, error } = await query
+    .order("sort_order")
+    .order("created_at");
+  if (error) throw new Error(error.message);
+
+  const { data: logs, error: logError } = await ctx.supabase
+    .from("habit_logs")
+    .select("*")
+    .gte("log_date", habitLogWindowStart(now));
+  if (logError) throw new Error(logError.message);
+
+  return ((habits ?? []) as Habit[]).map((habit) =>
+    habitSummary(habit, (logs ?? []) as HabitLog[], now, days)
+  );
+}
+
+async function saveHabit(ctx: ToolContext, input: ToolInput) {
+  const patch: Record<string, unknown> = {};
+  if (input.name !== undefined) patch.name = input.name;
+  if (input.weekdays !== undefined) patch.weekdays = input.weekdays;
+  // Archiving is the reversible way to retire a habit; the logs stay.
+  if (input.archived !== undefined) {
+    patch.archived_at = input.archived ? new Date().toISOString() : null;
+  }
+  if (!input.habit_id && !patch.name) {
+    throw new Error("name is required when creating a habit");
+  }
+
+  const query = input.habit_id
+    ? ctx.supabase
+        .from("habits")
+        .update(patch)
+        .eq("id", input.habit_id)
+        .eq("space_id", ctx.spaceId)
+    : ctx.supabase
+        .from("habits")
+        .insert({ ...patch, space_id: ctx.spaceId, created_by: ctx.userId });
+  const { data, error } = await query.select("*").single();
+  if (error) throw new Error(error.message);
+
+  const habit = data as Habit;
+  return {
+    saved: {
+      id: habit.id,
+      name: habit.name,
+      weekdays: habit.weekdays,
+      every_day: habit.weekdays.length === 0,
+      archived: habit.archived_at != null,
+    },
+  };
+}
+
+async function logHabit(ctx: ToolContext, input: ToolInput) {
+  const date = (input.date as string | undefined) ?? toLogDate(new Date());
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    throw new Error(`date must be YYYY-MM-DD, got "${date}"`);
+  }
+  const done = input.done !== false;
+
+  if (done) {
+    const { error } = await ctx.supabase.from("habit_logs").insert({
+      habit_id: input.habit_id,
+      user_id: ctx.userId,
+      log_date: date,
+    });
+    // 23505 = already logged for that day, which is the state we wanted.
+    if (error && error.code !== "23505") throw new Error(error.message);
+  } else {
+    const { error } = await ctx.supabase
+      .from("habit_logs")
+      .delete()
+      .eq("habit_id", input.habit_id)
+      .eq("user_id", ctx.userId)
+      .eq("log_date", date);
+    if (error) throw new Error(error.message);
+  }
+  return { habit_id: input.habit_id, date, done };
+}
+
+async function deleteHabit(ctx: ToolContext, input: ToolInput) {
+  // Logs go with the habit via the FK's ON DELETE CASCADE.
+  const { data, error } = await ctx.supabase
+    .from("habits")
+    .delete()
+    .eq("id", input.habit_id)
+    .eq("space_id", ctx.spaceId)
+    .select("id, name")
+    .single();
+  if (error) throw new Error(error.message);
+  return { deleted: data.name };
+}
+
+// ---------------------------------------------------------------------------
+// Horizons: life values and quarterly goals (personal, never space-scoped)
+// ---------------------------------------------------------------------------
+
+async function listLifeValues(ctx: ToolContext) {
+  const { data: values, error } = await ctx.supabase
+    .from("life_values")
+    .select("*")
+    .order("sort_order")
+    .order("created_at");
+  if (error) throw new Error(error.message);
+
+  const { data: goals, error: goalError } = await ctx.supabase
+    .from("goals")
+    .select("value_id, status");
+  if (goalError) throw new Error(goalError.message);
+
+  return ((values ?? []) as LifeValue[]).map((value) => ({
+    id: value.id,
+    name: value.name,
+    description: value.description,
+    active_goals: ((goals ?? []) as Goal[]).filter(
+      (g) => g.value_id === value.id && g.status === "active"
+    ).length,
+  }));
+}
+
+async function saveLifeValue(ctx: ToolContext, input: ToolInput) {
+  const patch: Record<string, unknown> = {};
+  if (input.name !== undefined) patch.name = input.name;
+  if (input.description !== undefined) {
+    patch.description = input.description === "" ? null : input.description;
+  }
+  if (!input.value_id && !patch.name) {
+    throw new Error("name is required when creating a life value");
+  }
+
+  const query = input.value_id
+    ? ctx.supabase.from("life_values").update(patch).eq("id", input.value_id)
+    : ctx.supabase
+        .from("life_values")
+        .insert({ ...patch, user_id: ctx.userId });
+  const { data, error } = await query.select("id, name, description").single();
+  if (error) throw new Error(error.message);
+  return { saved: data };
+}
+
+async function deleteLifeValue(ctx: ToolContext, input: ToolInput) {
+  // Goals pointing at it survive — the FK is ON DELETE SET NULL.
+  const { data, error } = await ctx.supabase
+    .from("life_values")
+    .delete()
+    .eq("id", input.value_id)
+    .select("id, name")
+    .single();
+  if (error) throw new Error(error.message);
+  return { deleted: data.name };
+}
+
+async function listGoals(ctx: ToolContext, input: ToolInput) {
+  const { data: goals, error } = await ctx.supabase
+    .from("goals")
+    .select("*")
+    .order("year", { ascending: false })
+    .order("quarter", { ascending: false })
+    .order("sort_order");
+  if (error) throw new Error(error.message);
+
+  const { data: values, error: valueError } = await ctx.supabase
+    .from("life_values")
+    .select("id, name");
+  if (valueError) throw new Error(valueError.message);
+
+  const now = new Date();
+  const current = {
+    year: now.getFullYear(),
+    quarter: Math.floor(now.getMonth() / 3) + 1,
+  };
+  const year = input.current_quarter ? current.year : (input.year as number | undefined);
+  const quarter = input.current_quarter
+    ? current.quarter
+    : (input.quarter as number | undefined);
+
+  const names = new Map(
+    ((values ?? []) as LifeValue[]).map((v) => [v.id, v.name])
+  );
+  return ((goals ?? []) as Goal[])
+    .filter((g) => year == null || g.year === year)
+    .filter((g) => quarter == null || g.quarter === quarter)
+    .filter((g) => !input.status || g.status === input.status)
+    .filter((g) => !input.value_id || g.value_id === input.value_id)
+    .map((g) => ({
+      id: g.id,
+      title: g.title,
+      description: g.description,
+      period: `Q${g.quarter} ${g.year}`,
+      year: g.year,
+      quarter: g.quarter,
+      current: g.year === current.year && g.quarter === current.quarter,
+      status: g.status,
+      score: g.score,
+      reflection: g.reflection,
+      value_id: g.value_id,
+      value: g.value_id ? (names.get(g.value_id) ?? null) : null,
+    }));
+}
+
+async function saveGoal(ctx: ToolContext, input: ToolInput) {
+  const patch: Record<string, unknown> = {};
+  for (const key of ["title", "year", "quarter", "status", "score"]) {
+    if (input[key] !== undefined) patch[key] = input[key];
+  }
+  for (const key of ["description", "reflection", "value_id"]) {
+    if (input[key] !== undefined) patch[key] = input[key] === "" ? null : input[key];
+  }
+
+  if (!input.goal_id) {
+    if (!patch.title) throw new Error("title is required when creating a goal");
+    // A goal without a quarter is not a quarterly goal — default to this one.
+    const now = new Date();
+    patch.year ??= now.getFullYear();
+    patch.quarter ??= Math.floor(now.getMonth() / 3) + 1;
+  }
+
+  const query = input.goal_id
+    ? ctx.supabase.from("goals").update(patch).eq("id", input.goal_id)
+    : ctx.supabase.from("goals").insert({ ...patch, user_id: ctx.userId });
+  const { data, error } = await query
+    .select("id, title, year, quarter, status, score, value_id")
+    .single();
+  if (error) throw new Error(error.message);
+  return { saved: data };
+}
+
+async function deleteGoal(ctx: ToolContext, input: ToolInput) {
+  const { data, error } = await ctx.supabase
+    .from("goals")
+    .delete()
+    .eq("id", input.goal_id)
+    .select("id, title")
+    .single();
+  if (error) throw new Error(error.message);
+  return { deleted: data.title };
+}
+
 export async function executeTool(
   name: string,
   input: ToolInput,
@@ -390,6 +660,26 @@ export async function executeTool(
       return deleteLifeExperience(ctx, input);
     case "set_life_horizon":
       return setLifeHorizon(ctx, input);
+    case "list_habits":
+      return listHabits(ctx, input);
+    case "save_habit":
+      return saveHabit(ctx, input);
+    case "log_habit":
+      return logHabit(ctx, input);
+    case "delete_habit":
+      return deleteHabit(ctx, input);
+    case "list_life_values":
+      return listLifeValues(ctx);
+    case "save_life_value":
+      return saveLifeValue(ctx, input);
+    case "delete_life_value":
+      return deleteLifeValue(ctx, input);
+    case "list_goals":
+      return listGoals(ctx, input);
+    case "save_goal":
+      return saveGoal(ctx, input);
+    case "delete_goal":
+      return deleteGoal(ctx, input);
     default:
       throw new Error(`Unknown tool: ${name}`);
   }

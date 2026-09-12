@@ -2,8 +2,8 @@
 
 import clsx from "clsx";
 import { Flame, Plus, RefreshCcw, Trash2 } from "lucide-react";
+import { habitDueOn, habitStreak } from "@gtd/shared";
 import { useMemo, useState } from "react";
-import { habitDueOn, habitStreak } from "@/lib/habits";
 import { PageHeader } from "@/components/task-list";
 import { Button, Dialog, EmptyState, Input } from "@/components/ui";
 import {
