@@ -23,6 +23,16 @@ const EXPECTED_TOOLS = [
   "save_life_experience",
   "delete_life_experience",
   "set_life_horizon",
+  "list_habits",
+  "save_habit",
+  "log_habit",
+  "delete_habit",
+  "list_life_values",
+  "save_life_value",
+  "delete_life_value",
+  "list_goals",
+  "save_goal",
+  "delete_goal",
 ];
 
 function fail(message: string): never {
@@ -213,6 +223,108 @@ if (JSON.parse(textOf(deletedExp)).deleted !== marker) {
   fail("delete_life_experience returned unexpected payload");
 }
 console.log("Tier 2: delete_life_experience OK (self-cleaning)");
+
+// ---- Tier 2: habits -------------------------------------------------------
+const savedHabit = await client.callTool({
+  name: "save_habit",
+  arguments: { name: marker, weekdays: [0, 1, 2, 3, 4, 5, 6] },
+});
+if (savedHabit.isError) fail(`save_habit errored: ${textOf(savedHabit)}`);
+const habitId: string =
+  JSON.parse(textOf(savedHabit)).saved?.id ?? fail("save_habit returned no id");
+console.log(`Tier 2: created habit ${habitId}`);
+
+const ticked = await client.callTool({
+  name: "log_habit",
+  arguments: { habit_id: habitId },
+});
+if (ticked.isError) fail(`log_habit errored: ${textOf(ticked)}`);
+
+const habitsListed = await client.callTool({ name: "list_habits", arguments: {} });
+if (habitsListed.isError) fail(`list_habits errored: ${textOf(habitsListed)}`);
+const habitRow = (JSON.parse(textOf(habitsListed)) as Array<Record<string, unknown>>)
+  .find((h) => h.id === habitId);
+if (!habitRow) fail("created habit missing from list_habits");
+if (!habitRow.done_today || habitRow.streak !== 1) {
+  fail(`expected a ticked habit to read done_today with streak 1, got ${JSON.stringify(habitRow)}`);
+}
+console.log("Tier 2: log_habit + streak OK");
+
+// Re-ticking the same day must be a no-op, not a duplicate-key error.
+const reticked = await client.callTool({
+  name: "log_habit",
+  arguments: { habit_id: habitId },
+});
+if (reticked.isError) fail(`log_habit (repeat) errored: ${textOf(reticked)}`);
+
+const unticked = await client.callTool({
+  name: "log_habit",
+  arguments: { habit_id: habitId, done: false },
+});
+if (unticked.isError) fail(`log_habit (untick) errored: ${textOf(unticked)}`);
+console.log("Tier 2: re-tick is idempotent, untick OK");
+
+const deletedHabit = await client.callTool({
+  name: "delete_habit",
+  arguments: { habit_id: habitId },
+});
+if (deletedHabit.isError) fail(`delete_habit errored: ${textOf(deletedHabit)}`);
+if (JSON.parse(textOf(deletedHabit)).deleted !== marker) {
+  fail("delete_habit returned unexpected payload");
+}
+console.log("Tier 2: delete_habit OK (self-cleaning)");
+
+// ---- Tier 2: values and goals ---------------------------------------------
+const savedValue = await client.callTool({
+  name: "save_life_value",
+  arguments: { name: marker, description: "created by the smoke test" },
+});
+if (savedValue.isError) fail(`save_life_value errored: ${textOf(savedValue)}`);
+const valueId: string =
+  JSON.parse(textOf(savedValue)).saved?.id ?? fail("save_life_value returned no id");
+
+const savedGoal = await client.callTool({
+  name: "save_goal",
+  arguments: { title: marker, value_id: valueId },
+});
+if (savedGoal.isError) fail(`save_goal errored: ${textOf(savedGoal)}`);
+const goalId: string =
+  JSON.parse(textOf(savedGoal)).saved?.id ?? fail("save_goal returned no id");
+console.log(`Tier 2: created value ${valueId} and goal ${goalId}`);
+
+const goalsListed = await client.callTool({
+  name: "list_goals",
+  arguments: { current_quarter: true },
+});
+if (goalsListed.isError) fail(`list_goals errored: ${textOf(goalsListed)}`);
+const goalRow = (JSON.parse(textOf(goalsListed)) as Array<Record<string, unknown>>)
+  .find((g) => g.id === goalId);
+if (!goalRow) fail("new goal missing from this quarter's list_goals");
+if (goalRow.value !== marker || goalRow.current !== true) {
+  fail(`expected the goal in the current quarter with its value resolved, got ${JSON.stringify(goalRow)}`);
+}
+console.log("Tier 2: list_goals resolves the value and the current quarter");
+
+const valuesListed = await client.callTool({ name: "list_life_values", arguments: {} });
+if (valuesListed.isError) fail(`list_life_values errored: ${textOf(valuesListed)}`);
+const valueRow = (JSON.parse(textOf(valuesListed)) as Array<Record<string, unknown>>)
+  .find((v) => v.id === valueId);
+if (valueRow?.active_goals !== 1) {
+  fail(`expected the value to count 1 active goal, got ${JSON.stringify(valueRow)}`);
+}
+console.log("Tier 2: list_life_values counts active goals");
+
+const deletedGoal = await client.callTool({
+  name: "delete_goal",
+  arguments: { goal_id: goalId },
+});
+if (deletedGoal.isError) fail(`delete_goal errored: ${textOf(deletedGoal)}`);
+const deletedValue = await client.callTool({
+  name: "delete_life_value",
+  arguments: { value_id: valueId },
+});
+if (deletedValue.isError) fail(`delete_life_value errored: ${textOf(deletedValue)}`);
+console.log("Tier 2: delete_goal + delete_life_value OK (self-cleaning)");
 
 console.log("SMOKE PASS");
 await client.close();

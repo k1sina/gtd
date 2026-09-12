@@ -283,5 +283,177 @@ server.registerTool(
   handler("set_life_horizon")
 );
 
+// --- Habits -----------------------------------------------------------------
+
+server.registerTool(
+  "list_habits",
+  {
+    description:
+      "List the habits in the current space with their schedule, whether they are due and done today, the current streak, and the most recent days. Call this for questions about habits, streaks, consistency, or what is still unticked today.",
+    inputSchema: {
+      days: z
+        .number()
+        .optional()
+        .describe("How many recent days to report per habit (1-90, default 7)"),
+      include_archived: z
+        .boolean()
+        .optional()
+        .describe("Also list retired habits (archived, not deleted)"),
+    },
+  },
+  handler("list_habits")
+);
+
+server.registerTool(
+  "save_habit",
+  {
+    description:
+      "Create or update a habit. Omit habit_id to create. weekdays uses 0 = Monday … 6 = Sunday, and an empty list means every day. Set archived to retire a habit (reversible, and its history survives) or to bring one back.",
+    inputSchema: {
+      habit_id: z
+        .string()
+        .optional()
+        .describe("Update this habit; omit to create a new one"),
+      name: z.string().optional().describe("Required when creating"),
+      weekdays: z
+        .array(z.number())
+        .optional()
+        .describe("0 = Monday … 6 = Sunday; empty list = every day"),
+      archived: z
+        .boolean()
+        .optional()
+        .describe("true retires the habit, false brings it back"),
+    },
+  },
+  handler("save_habit")
+);
+
+server.registerTool(
+  "log_habit",
+  {
+    description:
+      "Tick a habit for a day, or untick it with done false. Defaults to today. Get the habit id from list_habits first.",
+    inputSchema: {
+      habit_id: z.string(),
+      date: z.string().optional().describe("YYYY-MM-DD; defaults to today"),
+      done: z
+        .boolean()
+        .optional()
+        .describe("false removes the tick for that day (default true)"),
+    },
+  },
+  handler("log_habit")
+);
+
+server.registerTool(
+  "delete_habit",
+  {
+    description:
+      "Permanently delete a habit and its whole log history. Irreversible — prefer save_habit with archived true to retire a habit while keeping its record.",
+    inputSchema: { habit_id: z.string() },
+  },
+  handler("delete_habit")
+);
+
+// --- Horizons: life values and quarterly goals -------------------------------
+
+server.registerTool(
+  "list_life_values",
+  {
+    description:
+      "List the user's life values — what matters to them long-term — with how many active goals hang off each. Call this before advising on priorities or goals, and to get the value_id a goal should link to.",
+    inputSchema: {},
+  },
+  handler("list_life_values")
+);
+
+server.registerTool(
+  "save_life_value",
+  {
+    description:
+      "Create or update a life value (e.g. Health, Family, Craft). Omit value_id to create.",
+    inputSchema: {
+      value_id: z
+        .string()
+        .optional()
+        .describe("Update this value; omit to create a new one"),
+      name: z.string().optional().describe("Required when creating"),
+      description: z
+        .string()
+        .optional()
+        .describe("What living this value looks like"),
+    },
+  },
+  handler("save_life_value")
+);
+
+server.registerTool(
+  "delete_life_value",
+  {
+    description:
+      "Permanently delete a life value. Goals linked to it survive and lose the link. Irreversible.",
+    inputSchema: { value_id: z.string() },
+  },
+  handler("delete_life_value")
+);
+
+server.registerTool(
+  "list_goals",
+  {
+    description:
+      "List the user's quarterly goals, newest quarter first, each with the life value it serves and its review score. Call this for questions about what the quarter is for, progress against goals, or whether the work in front of them serves anything.",
+    inputSchema: {
+      current_quarter: z
+        .boolean()
+        .optional()
+        .describe("Only this quarter's goals (overrides year/quarter)"),
+      year: z.number().optional(),
+      quarter: z.number().optional().describe("1-4"),
+      status: z.enum(["active", "achieved", "partial", "dropped"]).optional(),
+      value_id: z.string().optional().describe("Only goals serving this life value"),
+    },
+  },
+  handler("list_goals")
+);
+
+server.registerTool(
+  "save_goal",
+  {
+    description:
+      "Create or update a quarterly goal — a concrete outcome for one quarter, optionally linked to a life value. Omit goal_id to create (it defaults to the current quarter). Scores and reflections are what the quarterly review writes back.",
+    inputSchema: {
+      goal_id: z
+        .string()
+        .optional()
+        .describe("Update this goal; omit to create a new one"),
+      title: z.string().optional().describe("Required when creating"),
+      description: z
+        .string()
+        .optional()
+        .describe("Why this, why now? How will you know it is done?"),
+      year: z.number().optional(),
+      quarter: z.number().optional().describe("1-4"),
+      value_id: z.string().optional().describe("Life value this serves"),
+      status: z.enum(["active", "achieved", "partial", "dropped"]).optional(),
+      score: z
+        .number()
+        .optional()
+        .describe("0-10, set during the quarterly review"),
+      reflection: z.string().optional().describe("How the quarter actually went"),
+    },
+  },
+  handler("save_goal")
+);
+
+server.registerTool(
+  "delete_goal",
+  {
+    description:
+      "Permanently delete a quarterly goal. Irreversible — prefer save_goal with status 'dropped' to let a goal go while keeping the record of having set it.",
+    inputSchema: { goal_id: z.string() },
+  },
+  handler("delete_goal")
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

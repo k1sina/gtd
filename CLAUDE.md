@@ -44,7 +44,10 @@ SwiftUI apps for iPhone/Mac/Watch with Siri App Intents, and an MCP server.
 - Client data layer: React Query hooks in `apps/web/src/lib/data.ts`;
   current space comes from `useSpace()` (`lib/space-context.tsx`). Swift
   equivalent: `ClarityKit` repositories.
-- Weekday numbering everywhere: 0 = Monday … 6 = Sunday (`isoWeekday`).
+- Weekday numbering everywhere: 0 = Monday … 6 = Sunday (`isoWeekday`). A
+  habit's empty `weekdays` means every day; due-day and streak logic lives in
+  `packages/shared/src/habits.ts` ↔ `ClarityCore/Periods.swift`
+  (`habitStreak`) / `Models.swift` (`Habit.isDue`) — keep in sync.
 - Task recurrence: RRULE strings handled by `packages/shared/src/recurrence.ts`
   (FREQ/INTERVAL/BYDAY/BYMONTHDAY subset only); completing a recurring task
   inserts the next occurrence CLIENT-side — the insert payload comes from
