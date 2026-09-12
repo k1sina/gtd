@@ -168,5 +168,120 @@ server.registerTool(
   handler("delete_task")
 );
 
+// --- Lifetime map -----------------------------------------------------------
+
+// Mirrored in the life_experiences.category check constraint and in
+// apps/web/src/lib/assistant-tools.ts.
+const EXPERIENCE_CATEGORIES = [
+  "travel",
+  "adventure",
+  "craft",
+  "people",
+  "create",
+  "wellbeing",
+  "contribute",
+  "other",
+] as const;
+
+server.registerTool(
+  "list_life_experiences",
+  {
+    description:
+      "List the experiences the user wants to have in their life (the lifetime map), with the age window each is placed in and the calendar years that window covers. Also returns the user's life horizon — current age, years left, share of the horizon spent. Call this for questions about what they want to live, what is planned for a stage of life, what windows are closing, or what is still an unplaced dream.",
+    inputSchema: {
+      status: z
+        .enum(["dream", "planned", "active", "lived", "released", "open"])
+        .optional()
+        .describe(
+          "'open' = everything not lived or released. 'released' = consciously let go."
+        ),
+      category: z
+        .enum(EXPERIENCE_CATEGORIES)
+        .optional()
+        .describe("Only experiences of this kind"),
+      unplaced: z
+        .boolean()
+        .optional()
+        .describe("Only experiences with no age window yet"),
+      within_years: z
+        .number()
+        .optional()
+        .describe(
+          'Only windows open now or opening within N years — use for "what should I do soon?"'
+        ),
+    },
+  },
+  handler("list_life_experiences")
+);
+
+server.registerTool(
+  "save_life_experience",
+  {
+    description:
+      "Create or update an experience on the lifetime map. Omit experience_id to create. Place it in life with target_age_start/target_age_end (ages, not dates — 'in my 40s' is 40 to 49); pass unplace to take the window off again. Use status 'lived' when it happened (with a reflection) and 'released' when the user consciously lets it go.",
+    inputSchema: {
+      experience_id: z
+        .string()
+        .optional()
+        .describe("Update this experience; omit to create a new one"),
+      title: z.string().optional().describe("Required when creating"),
+      notes: z.string().optional().describe("Why this one matters"),
+      category: z.enum(EXPERIENCE_CATEGORIES).optional(),
+      status: z
+        .enum(["dream", "planned", "active", "lived", "released"])
+        .optional()
+        .describe(
+          "Defaults follow the window: giving one makes it 'planned', removing it makes it 'dream'"
+        ),
+      target_age_start: z.number().optional().describe("Age the window opens"),
+      target_age_end: z
+        .number()
+        .optional()
+        .describe("Age the window closes (inclusive)"),
+      unplace: z
+        .boolean()
+        .optional()
+        .describe("Clear the age window, back to an unplaced dream"),
+      with_whom: z.string().optional().describe("Who it should be with"),
+      value_id: z.string().optional().describe("Life value this serves"),
+      lived_on: z
+        .string()
+        .optional()
+        .describe("YYYY-MM-DD; set automatically with status 'lived'"),
+      reflection: z
+        .string()
+        .optional()
+        .describe("What it was actually like, or why it is being let go"),
+    },
+  },
+  handler("save_life_experience")
+);
+
+server.registerTool(
+  "delete_life_experience",
+  {
+    description:
+      "Permanently delete an experience from the lifetime map. Irreversible — prefer save_life_experience with status 'released' to let something go while keeping the record of having wanted it.",
+    inputSchema: { experience_id: z.string() },
+  },
+  handler("delete_life_experience")
+);
+
+server.registerTool(
+  "set_life_horizon",
+  {
+    description:
+      "Set the scale the lifetime map is drawn against: the user's birth date and the age they choose to plan to (not a prediction — the default is 85). Without a birth date the map has no ages or years.",
+    inputSchema: {
+      birth_date: z.string().optional().describe("YYYY-MM-DD"),
+      life_expectancy: z
+        .number()
+        .optional()
+        .describe("40-120; the age they plan to"),
+    },
+  },
+  handler("set_life_horizon")
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);

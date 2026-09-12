@@ -13,7 +13,7 @@ SwiftUI apps for iPhone/Mac/Watch with Siri App Intents, and an MCP server.
   `Clarity/` (iOS+macOS app sources + App Intents), `ClarityWatch/`
   (standalone watch app). Xcode project is GENERATED: edit `project.yml`,
   run `xcodegen generate` — never edit `Clarity.xcodeproj`.
-- `apps/mcp` — MCP stdio server mirroring the web assistant's 4 tools
+- `apps/mcp` — MCP stdio server mirroring the web assistant's tools
   (`apps/web/src/lib/assistant-tools.ts`); keep the two in sync. Config via
   `apps/mcp/.env` (gitignored), registered in root `.mcp.json`. A remote MCP
   endpoint (`apps/web/src/app/api/mcp/route.ts`, Streamable HTTP, Basic auth
@@ -58,8 +58,8 @@ SwiftUI apps for iPhone/Mac/Watch with Siri App Intents, and an MCP server.
   sync.
 - Personal horizon data (`life_values`, `goals`, `reviews`, `life_horizon`,
   `life_experiences`) hangs off `user_id`, not `space_id` — it never crosses
-  into a shared space. The lifetime map (`/experiences`) places experiences
-  into age windows rather than dates; its maths lives in
-  `packages/shared/src/life.ts` and has no ClarityCore mirror yet.
+  into a shared space. The lifetime map (`/experiences`, Apple
+  `LifeMapView`) places experiences into age windows rather than dates; its
+  maths lives in `packages/shared/src/life.ts` ↔ `ClarityCore/Life.swift`.
 - New tables in `public` are NOT auto-exposed to API roles — migrations must
   GRANT to `authenticated` and add RLS policies.

@@ -48,8 +48,8 @@ cd apps/apple
 
 This runs the ClarityCore + ClarityKit Swift Testing suites:
 
-- **ClarityCore** — priority scoring, the recurrence engine, and the
-  quick-add parser. These are line-for-line mirrors of the vitest suites in
+- **ClarityCore** — priority scoring, the recurrence engine, the quick-add
+  parser, and the lifetime-map chapter maths. These are line-for-line mirrors of the vitest suites in
   `packages/shared/test`; the expected values must stay identical.
 - **ClarityKit** — JSON decode/encode fixtures against real PostgREST row
   shapes, the recurring-completion payload logic, stalled-parent detection,
@@ -116,7 +116,7 @@ in the keychain; you won't be asked again.
 
 The iPhone app has four tabs — **Next, Inbox, Browse, Settings** —
 where Browse holds everything else (Search first, then Scheduled, Waiting,
-Someday, Habits, Reviews, Goals). The Mac app shows all sections in a
+Someday, Habits, Reviews, Goals, Life experiences). The Mac app shows all sections in a
 GTD-grouped sidebar (Next → Capture → Upcoming & parked → Reflect),
 with the **space switcher** and a search button at the top (switch spaces,
 create a shared space, or join one from a pasted invite link; on iPhone the
@@ -176,6 +176,15 @@ switcher is in each tab's toolbar).
   next quarter's goals). The hub shows your weekly streak and history.
 - **Goals & values** — life values and quarterly goals with value links,
   statuses, and scores.
+- **Life experiences** — the lifetime map. Set your birth date and the age
+  you plan to once, then place experiences into windows of your life ("in
+  my 40s", "before 50") rather than onto dates. The year grid shows one
+  square per year — grey is spent, a solid square is where an experience
+  starts, a tint is the window it can happen in; tap a year to put
+  something in it. Rows flag windows *closing soon* and windows that
+  *passed*. Marking one **Lived** asks what it was actually like;
+  **Released** is letting something go on purpose. Same data as the web
+  `/experiences` page.
 - **Assistant** — the same GTD coach as the web `/assistant` page; it can
   read and change your tasks (including subtasks). Currently hidden from
   navigation — the user drives Clarity through Claude via MCP instead.
